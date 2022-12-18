@@ -1,6 +1,6 @@
 前年比、先月比、前日比を算出。%で表示。
 ````
-select data, name_jp, npatients from infection where data = "2022-12-16" and name_jp = "北海道";
+select date, name_jp, npatients from infection where date = "2022-12-16" and name_jp = "北海道";
 ````
 
 ここ一週間の平均

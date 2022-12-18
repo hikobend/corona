@@ -1,6 +1,6 @@
 CREATE TABLE `infection` (
   `id` int AUTO_INCREMENT PRIMARY KEY, 
-  `data` text, 
+  `date` text, 
   `name_jp` text, 
   `npatients` text
 );
