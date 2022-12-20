@@ -37,9 +37,37 @@ func main() {
 
 	r.POST("/import", Import)
 	r.GET("/gets", Get)
+	r.GET("/get/:date", GetInfectionByDate) // 日付を入力して、感染者を取得
 	r.GET("/npatients/:date", GetDateNpatients)
 
 	r.Run()
+}
+
+func GetInfectionByDate(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ?", date)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 func Get(c *gin.Context) {

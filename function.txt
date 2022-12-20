@@ -33,3 +33,13 @@ fmt.Println("month:", month)
 
 場所　日付
 select * from infection where name_jp = '北海道' and date between '2022-12-15' and '2022-12-16';
+
+日毎の感染者の合計
+select sum(npatients), date from infection group by date;
+
+日時指定
+select sum(npatients), date from infection group by date having date = '2022-12-12';
+select date, sum(npatients) from infection where date = '2022-12-12';
+
+日時指定し、合計も取得。
+select sum(npatients) from infection where date between '2022-12-12' and '2022-12-13';
