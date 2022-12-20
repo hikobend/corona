@@ -39,7 +39,7 @@ func main() {
 	r.GET("/gets", Get)
 	r.GET("/get/:date", GetInfectionByDate)                       // 日付を入力して、感染者を取得
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients) // 期間を選択し、感染者を取得
-	r.GET("/npatients/:date", GetDateNpatients)
+	r.GET("/npatients/:place/:date", GetDateNpatients)            // 日付を選択し、感染者を取得
 
 	r.Run()
 }
@@ -124,7 +124,6 @@ func Get(c *gin.Context) {
 }
 
 func GetDateNpatients(c *gin.Context) {
-
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		log.Fatal(err)
@@ -132,10 +131,11 @@ func GetDateNpatients(c *gin.Context) {
 	defer db.Close()
 
 	date := c.Param("date")
+	place := c.Param("place") // place用の別テーブルを作成して、そこのidを選択できないか。プルダウンで選択したい。
 
 	var infection infection
 
-	err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = '北海道' and date = ?", date).Scan(&infection.Date, &infection.NameJp, &infection.Npatients)
+	err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, date).Scan(&infection.Date, &infection.NameJp, &infection.Npatients)
 
 	if err != nil {
 		log.Fatal(err)
