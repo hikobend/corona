@@ -1,0 +1,35 @@
+前日
+
+now := time.Now()
+yesterday := now.Add(-24 * time.Hour)
+
+today := now.Format("2006-01-02T00:00:00Z")
+yest := yesterday.Format("2006-01-02T00:00:00Z")
+
+fmt.Println("Today:", today)
+fmt.Println("Yesterday:", yest)
+
+先月
+
+now := time.Now()
+lastMonth := now.AddDate(0, -1, 0)
+
+today := now.Format("2006-01-02T00:00:00Z")
+month := lastMonth.Format("2006-01")
+
+fmt.Println("Today:", today)
+fmt.Println("month:", month)
+
+前年
+
+now := time.Now()
+lastMonth := now.AddDate(-1, 0, 0)
+
+today := now.Format("2006-01-02T00:00:00Z")
+month := lastMonth.Format("2006")
+
+fmt.Println("Today:", today)
+fmt.Println("month:", month)
+
+場所　日付
+select * from infection where name_jp = '北海道' and date between '2022-12-15' and '2022-12-16';

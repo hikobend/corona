@@ -33,21 +33,13 @@ type infection struct {
 }
 
 func main() {
-	// r := gin.Default()
+	r := gin.Default()
 
-	// r.POST("/import", Import)
-	// r.GET("/gets", Get)
-	// r.GET("/npatients/:date", GetDateNpatients)
+	r.POST("/import", Import)
+	r.GET("/gets", Get)
+	r.GET("/npatients/:date", GetDateNpatients)
 
-	// r.Run()
-	now := time.Now()
-	yesterday := now.Add(-24 * time.Hour)
-
-	today := now.Format("2006-01-02T00:00:00Z")
-	yest := yesterday.Format("2006-01-02T00:00:00Z")
-
-	fmt.Println("Today:", today)
-	fmt.Println("Yesterday:", yest)
+	r.Run()
 }
 
 func Get(c *gin.Context) {
