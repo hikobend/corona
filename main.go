@@ -45,36 +45,6 @@ func main() {
 	r.Run()
 }
 
-func GetDiffBetWeenDateNpatientsWithPlace(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	place := c.Param("place")
-	date1 := c.Param("date1")
-	date2 := c.Param("date2")
-
-	rows, err := db.Query("select (select npatients from infection where date = ? and name_jp = ?) - (select npatients from infection where date = ? and name_jp = ?);", date2, place, date1, place)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Print(rows)
-	// var resultInfection []infection
-
-	// for rows.Next() {
-	// 	infection := infection{}
-	// 	if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	resultInfection = append(resultInfection, infection)
-	// }
-
-	// c.JSON(http.StatusOK, resultInfection)
-
-}
-
 func GetBetWeenDateNpatientsWithPlace(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
