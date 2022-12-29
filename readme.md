@@ -1,3 +1,6 @@
+コロナにかかる原因
+- 人との接触
+
 前年比、先月比、前日比を算出。%で表示。
 ````
 select date, name_jp, npatients from infection where date = "2022-12-16" and name_jp = "北海道";

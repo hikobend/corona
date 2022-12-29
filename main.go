@@ -41,8 +41,36 @@ func main() {
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
 	r.GET("/getnpatients/:place/:date1/:date2", GetBetWeenDateNpatientsWithPlace) // 期間を選択し、感染者を取得
+	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceByAsc)                   // 日付を選択して、感染者が少ない順に表示
 
 	r.Run()
+}
+
+func GetNpatientsWithPlaceByAsc(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? order by npatients ASC", date)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 func GetBetWeenDateNpatientsWithPlace(c *gin.Context) {
