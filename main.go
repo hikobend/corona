@@ -44,8 +44,37 @@ func main() {
 	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceAsc)                     // 日付を選択して、感染者が少ない順に表示
 	r.GET("/getnpatientsdesc/:date", GetNpatientsWithPlaceDesc)                   // 日付を選択して、感染者が多い順に表示
 	r.GET("/setnpatientsasc/:date/:count", SetNpatientsAsc)                       // 日付と感染者を入力して、感染者が上回った都道府県を少ない順に表示
+	r.GET("/setnpatientsdesc/:date/:count", SetNpatientsDesc)                     // 日付と感染者を入力して、感染者が上回った都道府県を多い順に表示
 
 	r.Run()
+}
+
+func SetNpatientsDesc(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+	count := c.Param("count")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients > ? order by npatients DESC;", date, count)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 func SetNpatientsAsc(c *gin.Context) {
