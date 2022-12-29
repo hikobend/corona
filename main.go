@@ -37,11 +37,71 @@ func main() {
 
 	r.POST("/import", Import)
 	r.GET("/gets", Get)
-	r.GET("/get/:date", GetInfectionByDate)                       // 日付を入力して、感染者を取得
-	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients) // 期間を選択し、感染者を取得
-	r.GET("/npatients/:place/:date", GetDateNpatients)            // 日付を選択し、感染者を取得
+	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
+	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
+	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
+	r.GET("/getnpatients/:place/:date1/:date2", GetBetWeenDateNpatientsWithPlace) // 期間を選択し、感染者を取得
 
 	r.Run()
+}
+
+func GetDiffBetWeenDateNpatientsWithPlace(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	place := c.Param("place")
+	date1 := c.Param("date1")
+	date2 := c.Param("date2")
+
+	rows, err := db.Query("select (select npatients from infection where date = ? and name_jp = ?) - (select npatients from infection where date = ? and name_jp = ?);", date2, place, date1, place)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print(rows)
+	// var resultInfection []infection
+
+	// for rows.Next() {
+	// 	infection := infection{}
+	// 	if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	resultInfection = append(resultInfection, infection)
+	// }
+
+	// c.JSON(http.StatusOK, resultInfection)
+
+}
+
+func GetBetWeenDateNpatientsWithPlace(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	place := c.Param("place")
+	date1 := c.Param("date1")
+	date2 := c.Param("date2")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date between ? and ?;", place, date1, date2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 func GetBetweenDateNpatients(c *gin.Context) {
@@ -96,7 +156,6 @@ func GetInfectionByDate(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resultInfection)
-
 }
 
 func Get(c *gin.Context) {

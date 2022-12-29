@@ -43,3 +43,6 @@ select date, sum(npatients) from infection where date = '2022-12-12';
 
 日時指定し、合計も取得。
 select sum(npatients) from infection where date between '2022-12-12' and '2022-12-13';
+
+期間を選択し、感染者を取得 県選択 感染者の差分を取得
+select (select npatients from infection where date = '2022-12-14' and name_jp = '北海道') - (select npatients from infection where date = '202' and name_jp = '北海道')
