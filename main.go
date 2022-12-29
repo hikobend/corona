@@ -32,11 +32,17 @@ type infection struct {
 	Npatients int       `json:"npatients"`
 }
 
+type Average struct {
+	Date      time.Time `json:"date"`
+	NameJp    string    `json:"name_jp"`
+	Npatients int       `json:"npatients"`
+}
+
 func main() {
 	r := gin.Default()
 
-	r.POST("/import", Import)
-	r.GET("/gets", Get)
+	r.POST("/import", Import)                                                     // データをimport
+	r.GET("/gets", Get)                                                           //
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
@@ -47,8 +53,68 @@ func main() {
 	r.GET("/setnpatientsdesc/:date/:count", SetNpatientsDesc)                     // 日付と感染者を入力して、感染者が上回った都道府県を多い順に表示
 	r.GET("/setnpatientsunderasc/:date/:count", SetNpatientsUnderAsc)             // 日付と感染者を入力して、感染者が下回った都道府県を少ない順に表示
 	r.GET("/setnpatientsunderdesc/:date/:count", SetNpatientsUnderDesc)           // 日付と感染者を入力して、感染者が下回った都道府県を多い順に表示
+	r.GET("/averagenpatients/:date", AverageNpatients)                            // 日付を入力して、全国の感染者を上回った都道府県を表示
+	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func AverageNpatientsOver(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients < (select avg(npatients) from infection)", date)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
+}
+
+func AverageNpatients(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients > (select avg(npatients) from infection)", date)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 func SetNpatientsUnderDesc(c *gin.Context) {
