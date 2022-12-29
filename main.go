@@ -41,8 +41,8 @@ type Average struct {
 func main() {
 	r := gin.Default()
 
+	r.POST("/create", Create)                                                     // コロナに関するメモを追加
 	r.POST("/import", Import)                                                     // データをimport
-	r.GET("/gets", Get)                                                           //
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
@@ -57,6 +57,10 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func Create(c *gin.Context) {
+
 }
 
 func AverageNpatientsOver(c *gin.Context) {
@@ -350,30 +354,6 @@ func GetInfectionByDate(c *gin.Context) {
 	date := c.Param("date")
 
 	rows, err := db.Query("select date, name_jp, npatients from infection where date = ?", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-}
-
-func Get(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date between '2022-12-16T00:00:00Z' and '2022-12-17T00:00:00Z'")
 	if err != nil {
 		log.Fatal(err)
 	}
