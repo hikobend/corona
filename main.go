@@ -34,10 +34,10 @@ type infection struct {
 }
 
 type Event_JSON struct {
-	Title       string    `json:"title" validate:"required"`
-	Description string    `json:"description"`
-	Begin       time.Time `json:"begin" validate:"required"`
-	End         time.Time `json:"end" validate:"required"`
+	Title       string `json:"title" validate:"required"`
+	Description string `json:"description"`
+	Begin       string `json:"begin" validate:"required"`
+	End         string `json:"end" validate:"required"`
 }
 
 func main() {
@@ -68,21 +68,45 @@ func Create(c *gin.Context) {
 	}
 	defer db.Close()
 
-	var event Event_JSON      // ここでは空
+	var json Event_JSON
 	validate := newFunction() //インスタンス生成
 
-	c.ShouldBindJSON(&event) // Bodyをeventという変数に入れる。
-
-	err = validate.Struct(&event) //バリデーションを実行し、NGの場合、ここでエラーが返る。
-	if err != nil {
-		log.Fatal(err)
+	if err := c.ShouldBindJSON(&json); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	insert, err := db.Prepare("insert into event(title, description, begin, end) values (?, ?, ?, ?)")
+	// yyyymmdd形式の文字列をtime.Time型に変換
+	layout := "20060102"
+	t, err := time.Parse(layout, json.Begin)
 	if err != nil {
-		log.Fatal(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	insert.Exec(event.Title, event.Description, event.Begin, event.End)
+
+	// yyyymmdd形式の文字列をtime.Time型に変換
+	t2, err := time.Parse(layout, json.End)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err = validate.Struct(&json); err != nil { //バリデーションを実行し、NGの場合、ここでエラーが返る。
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
+
+	insert, err := db.Prepare("INSERT INTO events (title, description, begin, end) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer insert.Close()
+
+	// パラメータを設定してクエリを実行
+	_, err = insert.Exec(json.Title, json.Description, t.Format("2006-01-02"), t2.Format("2006-01-02"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
 }
 
 func AverageNpatientsOver(c *gin.Context) {
