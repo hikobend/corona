@@ -43,6 +43,7 @@ type Event_JSON struct {
 func main() {
 	r := gin.Default()
 
+	r.GET("/diff", Diff)                                                          // 前日比を表示
 	r.POST("/create", Create)                                                     // コロナに関するメモを追加
 	r.POST("/import", Import)                                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
@@ -59,6 +60,38 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func Diff(c *gin.Context) {
+	// データベースへの接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+
+	if err != nil {
+		c.String(500, "Error: "+err.Error())
+		return
+	}
+	defer db.Close()
+
+	// SELECT文を実行
+	rows, err := db.Query("SELECT (SELECT npatients FROM infection WHERE date = '2022-12-15' AND name_jp = '北海道') - (SELECT npatients FROM infection WHERE date = '2022-12-14' AND name_jp = '北海道') as npatients")
+	if err != nil {
+		c.String(500, "Error: "+err.Error())
+		return
+	}
+	defer rows.Close()
+
+	// 取得した値を表示
+	var diff int
+	for rows.Next() {
+		err := rows.Scan(&diff)
+		if err != nil {
+			c.String(500, "Error: "+err.Error())
+			return
+		}
+		// c.String(200, fmt.Sprintf("%d", diff))
+		c.JSON(http.StatusOK, gin.H{"npatients": diff})
+
+	}
 }
 
 func Create(c *gin.Context) {
