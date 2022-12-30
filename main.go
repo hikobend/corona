@@ -32,10 +32,11 @@ type infection struct {
 	Npatients int       `json:"npatients"`
 }
 
-type Average struct {
-	Date      time.Time `json:"date"`
-	NameJp    string    `json:"name_jp"`
-	Npatients int       `json:"npatients"`
+type Event_JSON struct {
+	Title       string    `json:"title"`
+	description string    `json:"description"`
+	begin       time.Time `json:"begin"`
+	end         time.Time `json:"end"`
 }
 
 func main() {
@@ -60,7 +61,20 @@ func main() {
 }
 
 func Create(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/training?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
+	var json Event_JSON
+	c.ShouldBindJSON(&json)
+
+	insert, err := db.Prepare("INSERT INTO tasks(title, content) VALUES (?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	insert.Exec(json.Title, json.Content)
 }
 
 func AverageNpatientsOver(c *gin.Context) {

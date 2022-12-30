@@ -4,3 +4,11 @@ CREATE TABLE `infection` (
   `name_jp` text, 
   `npatients` int
 );
+
+create table `event` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `title` text,
+  `description` text,
+  `begin` date,
+  `end` date
+);
