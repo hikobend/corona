@@ -45,6 +45,7 @@ type Event_JSON struct {
 func main() {
 	r := gin.Default()
 
+	r.GET("/leastattachday/:place/:count", LeastAttachDay)                        // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
 	r.GET("/npatientsinmonth/:place/:date", NpatientsInMonth)                     // 年月と都道府県を取得して、その月の感染者数推移を取得
 	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)       // 年月と都道府県を取得して、その月の平均感染者数を取得
 	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
@@ -72,6 +73,33 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func LeastAttachDay(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(500, err.Error())
+		return
+	}
+	defer db.Close()
+
+	place := c.Param("place")
+	count := c.Param("count")
+
+	// SQLを実行
+	var min time.Time
+	err = db.QueryRow("select min(date), npatients from infection where name_jp = ? and npatients > ?", place, count).Scan(&min)
+	if err != nil {
+		c.JSON(500, err.Error())
+		return
+	}
+
+	yyyymmdd := min.Format("2006-01-02")
+
+	c.JSON(http.StatusOK, gin.H{
+		"day":   yyyymmdd,
+		"place": place,
+	})
 }
 
 func AverageNpatientsInMonth(c *gin.Context) {
