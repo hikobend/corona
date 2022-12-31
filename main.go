@@ -47,11 +47,13 @@ func main() {
 	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
 	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
 	r.POST("/create", Create)                                                     // コロナに関するメモを追加
-	r.GET("/show/:id", Show)                                                      // コロナに関するメモを表示
+	r.GET("/show/:id", Show)                                                      // コロナに関するメモを表示 -> 日程の感染者数の推移を表示したい -> ボタンを設置してGetInfectionByDateに飛ばせないか？
+	r.GET("/shows", ShowAll)                                                      // コロナに関するメモを表示
 	r.PATCH("/show/:id", Update)                                                  // コロナに関するメモを変更
 	r.DELETE("/delete/:id", Delete)                                               // コロナに関するメモを削除
 	r.POST("/import", Import)                                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
+	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)            // 日付と都道府県を選択し、感染者を取得
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
 	r.GET("/getnpatients/:place/:date1/:date2", GetBetWeenDateNpatientsWithPlace) // 期間を選択し、感染者を取得
@@ -208,6 +210,36 @@ func Show(c *gin.Context) {
 
 	// イベントをJSONで出力
 	c.JSON(http.StatusOK, json)
+}
+
+func ShowAll(c *gin.Context) {
+	// データベースに接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	// イベントを取得
+	rows, err := db.Query("SELECT title, description, begin, end FROM events")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer rows.Close()
+
+	var result []Event_JSON
+	for rows.Next() {
+		var json Event_JSON
+		if err := rows.Scan(&json.Title, &json.Description, &json.Begin, &json.End); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+			return
+		}
+		result = append(result, json)
+	}
+
+	c.JSON(http.StatusOK, result) // 200
 }
 
 func Update(c *gin.Context) {
@@ -556,6 +588,40 @@ func GetBetweenDateNpatients(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resultInfection)
 
+}
+
+func GetInfectionByDateAndPlace(c *gin.Context) {
+	// データベースに接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	// パラメーターから日付と場所を取得
+	date := c.Param("date")
+	place := c.Param("place")
+
+	// インフェクションを取得
+	rows, err := db.Query("SELECT date, name_jp, npatients FROM infection WHERE date = ? AND name_jp = ?", date, place)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer rows.Close()
+
+	var result []infection
+	for rows.Next() {
+		var inf infection
+		if err := rows.Scan(&inf.Date, &inf.NameJp, &inf.Npatients); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+			return
+		}
+		result = append(result, inf)
+	}
+
+	c.JSON(http.StatusOK, result) // 200
 }
 
 func GetInfectionByDate(c *gin.Context) {
