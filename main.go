@@ -48,6 +48,7 @@ func main() {
 	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
 	r.POST("/create", Create)                                                     // コロナに関するメモを追加
 	r.GET("/show/:id", Show)                                                      // コロナに関するメモを追加
+	r.PATCH("/show/:id", Update)                                                  // コロナに関するメモを追加
 	r.POST("/import", Import)                                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
@@ -193,8 +194,8 @@ func Show(c *gin.Context) {
 	}
 
 	// イベントを取得
-	var event Event_JSON
-	err = db.QueryRow("SELECT title, description, begin, end FROM events WHERE id = ?", id).Scan(&event.Title, &event.Description, &event.Begin, &event.End)
+	var json Event_JSON
+	err = db.QueryRow("SELECT title, description, begin, end FROM events WHERE id = ?", id).Scan(&json.Title, &json.Description, &json.Begin, &json.End)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "event not found"}) // 404
@@ -205,7 +206,32 @@ func Show(c *gin.Context) {
 	}
 
 	// イベントをJSONで出力
-	c.JSON(http.StatusOK, event)
+	c.JSON(http.StatusOK, json)
+}
+
+func Update(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	var json Event_JSON
+	c.ShouldBindJSON(&json)
+
+	// パラメーターからIDを取得
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
+	}
+
+	update, err := db.Prepare("UPDATE events SET title = ?, description = ?, begin = ?, end = ? WHERE id = ?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	update.Exec(json.Title, json.Description, json.Begin, json.End, id)
 }
 
 func AverageNpatientsOver(c *gin.Context) {
