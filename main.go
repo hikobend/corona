@@ -74,13 +74,15 @@ func main() {
 func TheDayBeforeRatioPatients(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
-		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	defer db.Close()
 
 	date, err := time.Parse("2006-01-02", c.Param("date"))
 	if err != nil {
-		log.Fatal(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
 	}
 	prevDate := date.AddDate(0, 0, -1)
 	NextDate := date.AddDate(0, 0, 1)
@@ -96,21 +98,24 @@ func TheDayBeforeRatioPatients(c *gin.Context) {
 		defer wg.Done()
 		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, NextDate).Scan(&infection1.Date, &infection1.NameJp, &infection1.Npatients)
 		if err != nil {
-			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+			return
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, date).Scan(&infection2.Date, &infection2.NameJp, &infection2.Npatients)
 		if err != nil {
-			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+			return
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prevDate).Scan(&infection3.Date, &infection3.NameJp, &infection3.Npatients)
 		if err != nil {
-			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+			return
 		}
 	}()
 	wg.Wait()
@@ -685,7 +690,7 @@ func GetInfectionByDate(c *gin.Context) {
 
 	date := c.Param("date")
 
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ?", date)
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = '2022-12-12' and name_jp = '青森県'", date)
 	if err != nil {
 		log.Fatal(err)
 	}
