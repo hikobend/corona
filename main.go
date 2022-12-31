@@ -62,6 +62,7 @@ func main() {
 
 	r.Run()
 }
+
 func CountOfPatients(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
@@ -89,7 +90,7 @@ func Diff(c *gin.Context) {
 	// データベースへの接続
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
-		c.String(500, "Error: "+err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	defer db.Close()
@@ -97,7 +98,7 @@ func Diff(c *gin.Context) {
 	// SELECT文を実行
 	rows, err := db.Query("SELECT (SELECT npatients FROM infection WHERE date = '2022-12-15' AND name_jp = '北海道') - (SELECT npatients FROM infection WHERE date = '2022-12-14' AND name_jp = '北海道') as npatients")
 	if err != nil {
-		c.String(500, "Error: "+err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	defer rows.Close()
@@ -107,7 +108,7 @@ func Diff(c *gin.Context) {
 	for rows.Next() {
 		err := rows.Scan(&diff)
 		if err != nil {
-			c.String(500, "Error: "+err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		// c.String(200, fmt.Sprintf("%d", diff))
