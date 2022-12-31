@@ -43,6 +43,7 @@ type Event_JSON struct {
 func main() {
 	r := gin.Default()
 
+	r.GET("/count/:date", CountOfPatients)
 	r.GET("/diff", Diff)                                                          // 前日比を表示
 	r.POST("/create", Create)                                                     // コロナに関するメモを追加
 	r.POST("/import", Import)                                                     // データをimport
@@ -61,11 +62,32 @@ func main() {
 
 	r.Run()
 }
+func CountOfPatients(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer db.Close()
+	date := c.Param("date")
+
+	var sum int
+	err = db.QueryRow("select sum(npatients) from infection where date = ?", date).Scan(&sum)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 結果をJSONで出力
+	c.JSON(http.StatusOK, gin.H{
+		"date":      date,
+		"npatients": sum,
+	})
+}
 
 func Diff(c *gin.Context) {
 	// データベースへの接続
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-
 	if err != nil {
 		c.String(500, "Error: "+err.Error())
 		return
