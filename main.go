@@ -89,6 +89,51 @@ func AreaNpatients(c *gin.Context) {
 	date := c.Param("date")
 	place := c.Param("place")
 
+	var rows *sql.Rows
+
+	switch place {
+	case "北海道":
+		rows, err = db.Query("select date, name_jp, npatients from infection where name_jp = '北海道' and date = ?", date)
+
+	case "東北":
+		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = ?", date)
+
+	case "関東":
+		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '茨城県' or name_jp = '栃木県' or name_jp = '群馬県' or name_jp = '埼玉県' or name_jp ='千葉県' or name_jp = '東京都' or name_jp = '神奈川県') and date = ?", date)
+
+	case "中部":
+		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '新潟県' or name_jp = '富山県' or name_jp = '石川県' or name_jp = '福井県' or name_jp ='山梨県' or name_jp = '長野県' or name_jp = '岐阜県' or name_jp = '静岡県' or name_jp = '愛知県') and date = ?", date)
+
+	case "近畿":
+		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '三重県' or name_jp = '滋賀県' or name_jp = '京都府' or name_jp = '大阪府' or name_jp ='兵庫県' or name_jp = '奈良県' or name_jp = '和歌山県') and date = ?", date)
+
+	case "中国":
+		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '鳥取県' or name_jp = '島根県' or name_jp = '岡山県' or name_jp = '広島県' or name_jp ='山口県') and date = ?", date)
+
+	case "四国":
+		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '徳島県' or name_jp = '香川県' or name_jp = '愛媛県' or name_jp = '高知県') and date = ?", date)
+
+	case "九州":
+		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '福岡県' or name_jp = '佐賀県' or name_jp = '長崎県' or name_jp = '熊本県' or name_jp ='大分県' or name_jp = '宮崎県' or name_jp = '鹿児島県' or name_jp = '沖縄県') and date = ?", date)
+	}
+	// インフェクションを取得
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer rows.Close()
+
+	var result []infection
+	for rows.Next() {
+		var inf infection
+		if err := rows.Scan(&inf.Date, &inf.NameJp, &inf.Npatients); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+			return
+		}
+		result = append(result, inf)
+	}
+
+	c.JSON(http.StatusOK, result) // 200
 }
 
 func AverageNpatientsInYear(c *gin.Context) {
