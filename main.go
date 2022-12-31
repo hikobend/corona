@@ -45,7 +45,8 @@ type Event_JSON struct {
 func main() {
 	r := gin.Default()
 
-	r.GET("/AreaNpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する。
+	r.GET("/areanpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する
+	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)             // 地方と日付を入力して、感染者の平均を取得する
 	r.GET("/leastattachday/:place/:count", LeastAttachDay)                        // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
 	r.GET("/npatientsinyear/:place/:date", NpatientsInYear)                       // 年と都道府県を取得して、その年の感染者推移を取得
 	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)         // 年と都道府県を取得して、その年の平均感染者数を取得
@@ -76,6 +77,57 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func AreaAverageNpatients(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(500, err.Error())
+		return
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+	place := c.Param("place")
+
+	var avg float64
+
+	switch place {
+	case "北海道":
+		err = db.QueryRow("select avg(npatients) from infection where name_jp = '北海道' and date = ?", date).Scan(&avg)
+
+	case "東北":
+		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = ?", date).Scan(&avg)
+
+	case "関東":
+		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '茨城県' or name_jp = '栃木県' or name_jp = '群馬県' or name_jp = '埼玉県' or name_jp ='千葉県' or name_jp = '東京都' or name_jp = '神奈川県') and date = ?", date).Scan(&avg)
+
+	case "中部":
+		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '新潟県' or name_jp = '富山県' or name_jp = '石川県' or name_jp = '福井県' or name_jp ='山梨県' or name_jp = '長野県' or name_jp = '岐阜県' or name_jp = '静岡県' or name_jp = '愛知県') and date = ?", date).Scan(&avg)
+
+	case "近畿":
+		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '三重県' or name_jp = '滋賀県' or name_jp = '京都府' or name_jp = '大阪府' or name_jp ='兵庫県' or name_jp = '奈良県' or name_jp = '和歌山県') and date = ?", date).Scan(&avg)
+
+	case "中国":
+		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '鳥取県' or name_jp = '島根県' or name_jp = '岡山県' or name_jp = '広島県' or name_jp ='山口県') and date = ?", date).Scan(&avg)
+
+	case "四国":
+		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '徳島県' or name_jp = '香川県' or name_jp = '愛媛県' or name_jp = '高知県') and date = ?", date).Scan(&avg)
+
+	case "九州":
+		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '福岡県' or name_jp = '佐賀県' or name_jp = '長崎県' or name_jp = '熊本県' or name_jp ='大分県' or name_jp = '宮崎県' or name_jp = '鹿児島県' or name_jp = '沖縄県') and date = ?", date).Scan(&avg)
+	}
+	// インフェクションを取得
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		// "month":     date,
+		// "place":     place,
+		"npatients": avg,
+	})
 }
 
 func AreaNpatients(c *gin.Context) {
