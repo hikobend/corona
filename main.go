@@ -53,11 +53,12 @@ func main() {
 	r.PATCH("/show/:id", Update)                                                  // コロナに関するメモを変更
 	r.DELETE("/delete/:id", Delete)                                               // コロナに関するメモを削除
 	r.POST("/import", Import)                                                     // データをimport
-	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
+	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
 	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)            // 日付と都道府県を選択し、感染者を取得
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
-	r.GET("/npatientsyesterday/:place/:date", TheDayBeforeRatioPatients)          // 日付と地域を選択し、3日間の感染者を取得
+	r.GET("/npatientsthreeday/:place/:date", TheDayBeforeRatioPatients)           // 日付と地域を選択し、3日間の感染者を取得
+	r.GET("/npatientsthreedayall/:date", TheDayBeforeRatioPatientsAll)            // 日付を選択し、3日間の感染者を取得 47都道府県
 	r.GET("/getnpatients/:place/:date1/:date2", GetBetWeenDateNpatientsWithPlace) // 期間を選択し、感染者を取得
 	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceAsc)                     // 日付を選択して、感染者が少ない順に表示
 	r.GET("/getnpatientsdesc/:date", GetNpatientsWithPlaceDesc)                   // 日付を選択して、感染者が多い順に表示
@@ -69,6 +70,38 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func TheDayBeforeRatioPatientsAll(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date, err := time.Parse("2006-01-02", c.Param("date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
+	}
+	prevDate := date.AddDate(0, 0, -1)
+	NextDate := date.AddDate(0, 0, 1)
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? or date = ? or date = ?", prevDate, date, NextDate)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
 }
 
 func TheDayBeforeRatioPatients(c *gin.Context) {
@@ -690,7 +723,7 @@ func GetInfectionByDate(c *gin.Context) {
 
 	date := c.Param("date")
 
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = '2022-12-12' and name_jp = '青森県'", date)
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ?", date)
 	if err != nil {
 		log.Fatal(err)
 	}
