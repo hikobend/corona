@@ -46,3 +46,5 @@ select sum(npatients) from infection where date between '2022-12-12' and '2022-1
 
 期間を選択し、感染者を取得 県選択 感染者の差分を取得
 select (select npatients from infection where date = '2022-12-14' and name_jp = '北海道') - (select npatients from infection where date = '202' and name_jp = '北海道')
+
+select date, name_jp, npatients from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = '2022-12-12' and npatients > (select avg(npatients) from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = '2022-12-12');
