@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -56,6 +57,7 @@ func main() {
 	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)            // 日付と都道府県を選択し、感染者を取得
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
+	r.GET("/npatientsyesterday/:place/:date", TheDayBeforeRatioPatients)          // 日付と地域を選択し、3日間の感染者を取得
 	r.GET("/getnpatients/:place/:date1/:date2", GetBetWeenDateNpatientsWithPlace) // 期間を選択し、感染者を取得
 	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceAsc)                     // 日付を選択して、感染者が少ない順に表示
 	r.GET("/getnpatientsdesc/:date", GetNpatientsWithPlaceDesc)                   // 日付を選択して、感染者が多い順に表示
@@ -67,6 +69,56 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func TheDayBeforeRatioPatients(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date, err := time.Parse("2006-01-02", c.Param("date"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	prevDate := date.AddDate(0, 0, -1)
+	NextDate := date.AddDate(0, 0, 1)
+
+	place := c.Param("place")
+
+	var infection1 infection
+	var infection2 infection
+	var infection3 infection
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, NextDate).Scan(&infection1.Date, &infection1.NameJp, &infection1.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, date).Scan(&infection2.Date, &infection2.NameJp, &infection2.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prevDate).Scan(&infection3.Date, &infection3.NameJp, &infection3.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	wg.Wait()
+
+	// 取得した感染者数を配列に格納する
+	infections := []infection{infection1, infection2, infection3}
+
+	c.JSON(http.StatusOK, infections)
 }
 
 func CountOfPatients(c *gin.Context) {
