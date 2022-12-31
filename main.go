@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -46,6 +47,7 @@ func main() {
 	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
 	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
 	r.POST("/create", Create)                                                     // コロナに関するメモを追加
+	r.GET("/show/:id", Show)                                                      // コロナに関するメモを追加
 	r.POST("/import", Import)                                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
@@ -172,6 +174,38 @@ func Create(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
+}
+
+func Show(c *gin.Context) {
+	// データベースに接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	// パラメーターからIDを取得
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
+	}
+
+	// イベントを取得
+	var event Event_JSON
+	err = db.QueryRow("SELECT title, description, begin, end FROM events WHERE id = ?", id).Scan(&event.Title, &event.Description, &event.Begin, &event.End)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "event not found"}) // 404
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// イベントをJSONで出力
+	c.JSON(http.StatusOK, event)
 }
 
 func AverageNpatientsOver(c *gin.Context) {
