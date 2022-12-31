@@ -45,8 +45,8 @@ type Event_JSON struct {
 func main() {
 	r := gin.Default()
 
-	r.GET("/npatientsinmonth/:place/:date", NpatientsInMonth) // 年月と都道府県を取得して、その月の感染者数推移を取得
-	// r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 年月と都道府県を取得して、その月の平均感染者数を取得
+	r.GET("/npatientsinmonth/:place/:date", NpatientsInMonth)                     // 年月と都道府県を取得して、その月の感染者数推移を取得
+	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)       // 年月と都道府県を取得して、その月の平均感染者数を取得
 	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
 	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
 	r.POST("/create", Create)                                                     // コロナに関するメモを追加
@@ -72,6 +72,32 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func AverageNpatientsInMonth(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(500, err.Error())
+		return
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+	place := c.Param("place")
+
+	// SQLを実行
+	var avg float64
+	err = db.QueryRow("select avg(npatients) from infection where name_jp = ? and date like ?", place, date+"%").Scan(&avg)
+	if err != nil {
+		c.JSON(500, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"yyyymm":    date,
+		"place":     place,
+		"npatients": avg,
+	})
 }
 
 func NpatientsInMonth(c *gin.Context) {
