@@ -43,8 +43,8 @@ type Event_JSON struct {
 func main() {
 	r := gin.Default()
 
-	r.GET("/count/:date", CountOfPatients)
-	r.GET("/diff", Diff)                                                          // 前日比を表示
+	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
+	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
 	r.POST("/create", Create)                                                     // コロナに関するメモを追加
 	r.POST("/import", Import)                                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県
@@ -70,6 +70,7 @@ func CountOfPatients(c *gin.Context) {
 		return
 	}
 	defer db.Close()
+
 	date := c.Param("date")
 
 	var sum int
@@ -95,8 +96,12 @@ func Diff(c *gin.Context) {
 	}
 	defer db.Close()
 
+	place := c.Param("place")
+	date1 := c.Param("date1")
+	date2 := c.Param("date2")
+
 	// SELECT文を実行
-	rows, err := db.Query("SELECT (SELECT npatients FROM infection WHERE date = '2022-12-15' AND name_jp = '北海道') - (SELECT npatients FROM infection WHERE date = '2022-12-14' AND name_jp = '北海道') as npatients")
+	rows, err := db.Query("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date2, place, date1, place)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -111,8 +116,12 @@ func Diff(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		// c.String(200, fmt.Sprintf("%d", diff))
-		c.JSON(http.StatusOK, gin.H{"npatients": diff})
+		c.JSON(http.StatusOK, gin.H{
+			"begin":     date1,
+			"end":       date2,
+			"place":     place,
+			"npatients": diff,
+		})
 
 	}
 }
