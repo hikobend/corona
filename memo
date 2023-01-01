@@ -14,5 +14,15 @@ CREATE TABLE `events` (
 );
 
 CREATE TABLE `events` (
-          `time` DATE
+  `time` DATE
 );
+
+CREATE TABLE `decease` (
+  `id` int AUTO_INCREMENT PRIMARY KEY, 
+  `date` date, 
+  `data_name` text, 
+  `infected_num` int,
+  `deceased_num` int
+);
+
+set global max_prepared_stmt_count=50000;

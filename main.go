@@ -49,6 +49,13 @@ type infection struct {
 	Npatients int       `json:"npatients"`
 }
 
+type decease struct {
+	Date        time.Time `json:"date"`
+	DataName    string    `json:"data_name"`
+	InfectedNum int       `json:"infected_mum"`
+	DeceasedNum int       `json:"deceased_num"`
+}
+
 type Event_JSON struct {
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description"`
@@ -75,6 +82,7 @@ func main() {
 	r.PATCH("/show/:id", Update)                                                  // コロナに関するメモを変更
 	r.DELETE("/delete/:id", Delete)                                               // コロナに関するメモを削除
 	r.POST("/import", Import)                                                     // データをimport
+	r.POST("/importdeceased", ImportDeceased)                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
 	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)            // 日付と都道府県を選択し、感染者を取得
 	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
@@ -1126,6 +1134,47 @@ func Import(c *gin.Context) { // データ取得、データベースに保存
 			log.Fatal(err)
 		}
 		insert.Exec(v.Date, v.NameJp, v.Npatients)
+	}
+
+	log.Print("データ取り込み完了")
+}
+
+func ImportDeceased(c *gin.Context) { // データ取得、データベースに保存
+	log.Print("データ取り込み中")
+	url := "https://opendata.corona.go.jp/api/OccurrenceStatusOverseas"
+	resp, _ := http.Get(url)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	byteArray, _ := ioutil.ReadAll(resp.Body)
+
+	jsonBytes := ([]byte)(byteArray)
+	data := new(Deceased)
+
+	if err := json.Unmarshal(jsonBytes, data); err != nil {
+		fmt.Println("JSON Unmarshal error:", err)
+		return
+	}
+	// fmt.Println(data.ItemList)
+
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	delete, err := db.Prepare("DELETE FROM decease")
+	if err != nil {
+		log.Fatal(err)
+	}
+	delete.Exec()
+
+	for _, v := range data.ItemList {
+		insert, err := db.Prepare("INSERT INTO decease(date, data_name, infected_num, deceased_num) values (?,?,?,?)")
+		if err != nil {
+			log.Fatal(err)
+		}
+		insert.Exec(v.Date, v.DataName, v.InfectedNum, v.DeceasedNum)
 	}
 
 	log.Print("データ取り込み完了")
