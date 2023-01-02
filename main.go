@@ -53,13 +53,6 @@ type diff_Npatients struct {
 	Npatients int `json:"npatients"`
 }
 
-// type decease struct {
-// 	Date        time.Time `json:"date"`
-// 	DataName    string    `json:"data_name"`
-// 	InfectedNum int       `json:"infected_mum"`
-// 	DeceasedNum int       `json:"deceased_num"`
-// }
-
 type Event_JSON struct {
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description"`
@@ -113,12 +106,20 @@ func main() {
 	// -------------
 
 	// イベントのCRUD
-
 	r.POST("/create", Create)       // コロナに関するメモを追加
 	r.GET("/show/:id", Show)        // コロナに関するメモを表示 -> 日程の感染者数の推移を表示したい -> ボタンを設置してGetInfectionByDateに飛ばせないか？
 	r.GET("/shows", ShowAll)        // コロナに関するメモを表示
 	r.PATCH("/show/:id", Update)    // コロナに関するメモを変更
 	r.DELETE("/delete/:id", Delete) // コロナに関するメモを削除
+
+	// -------------
+	// 3 - 2
+	// -------------
+
+	r.GET("/getInfection/:date1/:date2", ThirdSecond) // 期間を選択し、感染者を取得 47都道府県
+
+	// データimport
+	r.POST("/import", Import) // データをimport
 
 	r.GET("/areanpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する
 	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)             // 地方と日付を入力して、感染者の平均を取得する
@@ -128,11 +129,9 @@ func main() {
 	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)       // 年月と都道府県を取得して、その月の平均感染者数を取得
 	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
 	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
-	r.POST("/import", Import)                                                     // データをimport
 	r.POST("/importdeceased", ImportDeceased)                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
 	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)            // 日付と都道府県を選択し、感染者を取得
-	r.GET("/getInfection/:date1/:date2", GetBetweenDateNpatients)                 // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
 	r.GET("/npatientsthreeday/:place/:date", TheDayBeforeRatioPatients)           // 日付と地域を選択し、3日間の感染者を取得
 	r.GET("/npatientsthreedayall/:date", TheDayBeforeRatioPatientsAll)            // 日付を選択し、3日間の感染者を取得 47都道府県
@@ -408,6 +407,10 @@ func SecondThird(c *gin.Context) {
 
 }
 
+// -------------
+// 3 - 1
+// -------------
+
 func Create(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
@@ -583,6 +586,38 @@ func Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK) // 200
+}
+
+// -------------
+// 3 - 2
+// -------------
+
+func ThirdSecond(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date1 := c.Param("date1")
+	date2 := c.Param("date2")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date between ? and ? order by date ASC", date1, date2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 func AreaAverageNpatientsOver(c *gin.Context) {
@@ -1217,34 +1252,6 @@ func GetBetWeenDateNpatientsWithPlace(c *gin.Context) {
 	date2 := c.Param("date2")
 
 	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date between ? and ?;", place, date1, date2)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func GetBetweenDateNpatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date1 := c.Param("date1")
-	date2 := c.Param("date2")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date between ? and ?", date1, date2)
 	if err != nil {
 		log.Fatal(err)
 	}
