@@ -16,6 +16,19 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
+type Npatients struct {
+	ErrorInfo struct {
+		ErrorFlag    string `json:"errorFlag"`
+		ErrorCode    string `json:"errorCode"`
+		ErrorMessage string `json:"errorMessage"`
+	} `json:"errorInfo"`
+	ItemList []struct {
+		Date      string `json:"date"`
+		NameJp    string `json:"name_jp"`
+		Npatients string `json:"npatients"`
+	} `json:"itemList"`
+}
+
 type Medical struct {
 	FacilityId   string `json:"facilityId"`
 	FacilityName string `json:"facilityName"`
@@ -31,33 +44,6 @@ type Medical struct {
 	LocalGovCode string `json:"localGovCode"`
 	CityName     string `json:"cityName"`
 	FacilityCode string `json:"facilityCode"`
-}
-
-type Medicals struct {
-	FacilityName string `json:"facilityName"` // 病院名
-	ZipCode      string `json:"zipCode"`      // 郵便番号
-	PrefName     string `json:"prefName"`     // 都道府県
-	FacilityAddr string `json:"facilityAddr"` // 場所
-	FacilityTel  string `json:"facilityTel"`  // 電話番号
-	SubmitDate   string `json:"submitDate"`   // 日付
-	FacilityType string `json:"facilityType"`
-	AnsType      string `json:"ansType"`
-	LocalGovCode string `json:"localGovCode"`
-	CityName     string `json:"cityName"`
-	FacilityCode string `json:"facilityCode"`
-}
-
-type Npatients struct {
-	ErrorInfo struct {
-		ErrorFlag    string `json:"errorFlag"`
-		ErrorCode    string `json:"errorCode"`
-		ErrorMessage string `json:"errorMessage"`
-	} `json:"errorInfo"`
-	ItemList []struct {
-		Date      string `json:"date"`
-		NameJp    string `json:"name_jp"`
-		Npatients string `json:"npatients"`
-	} `json:"itemList"`
 }
 
 type infection struct {
@@ -92,84 +78,56 @@ type Event_JSON struct {
 	End         string `json:"end" validate:"required"`
 }
 
+type Medicals struct {
+	FacilityName string `json:"facilityName"` // 病院名
+	ZipCode      string `json:"zipCode"`      // 郵便番号
+	PrefName     string `json:"prefName"`     // 都道府県
+	FacilityAddr string `json:"facilityAddr"` // 場所
+	FacilityTel  string `json:"facilityTel"`  // 電話番号
+	SubmitDate   string `json:"submitDate"`   // 日付
+	FacilityType string `json:"facilityType"` // 状況
+	CityName     string `json:"cityName"`     // 市町村
+}
+
 func main() {
 	r := gin.Default()
-
 	// ----------------------------------
 	// デフォルトで表示
 	// ----------------------------------
 	r.GET("/count/:date", CountOfPatients)                     // 日の感染者の合計
 	r.GET("/averagenpatients/:date", AverageNpatients)         // 日付を入力して、全国の感染者を上回った都道府県を表示
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver) // 日付を入力して、全国の感染者を下回った都道府県を表示
-
 	// ----------------------------------
 	// 1
 	// ----------------------------------
-
-	// -------------
-	// 1 - 1
-	// -------------
-
-	r.GET("/firstfirst/:date", FirstFirst) // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
-
-	// -------------
-	// 1 - 2
-	// -------------
-
+	r.GET("/firstfirst/:date", FirstFirst)   // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
 	r.GET("/firstsecond/:date", FirstSecond) // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
-
 	// ----------------------------------
 	// 2
 	// ----------------------------------
-
-	// -------------
-	// 2 - 1
-	// -------------
-
-	r.GET("/secondfirst/:place/:date", SecondFirst) // ここ7日間の感染者推移
-	r.GET("/diffadd/:place/:date", DiffAdd)         // 前日比を表示
-
-	// -------------
-	// 2 - 2
-	// -------------
-
-	// 1ヶ月の推移を表示
+	r.GET("/secondfirst/:place/:date", SecondFirst)       // ここ7日間の感染者推移
+	r.GET("/diffadd/:place/:date", DiffAdd)               // 前日比を表示
 	r.GET("/npatientsinmonth/:place/:date", SecondSecond) // 年月と都道府県を取得して、その月の感染者数推移を取得
-
-	// -------------
-	// 2 - 3
-	// -------------
-
-	r.GET("/npatientsinyear/:place/:date", SecondThird) // 年と都道府県を取得して、その年の感染者推移を取得
-
+	r.GET("/npatientsinyear/:place/:date", SecondThird)   // 年と都道府県を取得して、その年の感染者推移を取得
 	// ----------------------------------
 	// 3
 	// ----------------------------------
-
-	// -------------
-	// 3 - 1
-	// -------------
-
-	// イベントのCRUD
-	r.POST("/create", Create)       // コロナに関するメモを追加
-	r.GET("/show/:id", Show)        // コロナに関するメモを表示 -> 日程の感染者数の推移を表示したい -> ボタンを設置してGetInfectionByDateに飛ばせないか？
-	r.GET("/shows", ShowAll)        // コロナに関するメモを表示
-	r.PATCH("/show/:id", Update)    // コロナに関するメモを変更
-	r.DELETE("/delete/:id", Delete) // コロナに関するメモを削除
-
-	// -------------
-	// 3 - 2
-	// -------------
-
-	r.GET("/getInfection/:date1/:date2", ThirdSecond) // 期間を選択し、感染者を取得 47都道府県
-
-	// -------------
-	// 3 - 3
-	// -------------
-
+	r.POST("/create", Create)                               // コロナに関するメモを追加
+	r.GET("/show/:id", Show)                                // コロナに関するメモを表示
+	r.GET("/shows", ShowAll)                                // コロナに関するメモを表示
+	r.PATCH("/show/:id", Update)                            // コロナに関するメモを変更
+	r.DELETE("/delete/:id", Delete)                         // コロナに関するメモを削除
+	r.GET("/getInfection/:date1/:date2", ThirdSecond)       // 期間を選択し、感染者を取得 47都道府県
 	r.GET("/getnpatients/:place/:date1/:date2", ThirdThird) // 期間を選択し、感染者を取得
-
-	// データimport
+	// ----------------------------------
+	// 4
+	// ----------------------------------
+	// ----------------------------------
+	// 5
+	// ----------------------------------
+	// ----------------------------------
+	// データをimport
+	// ----------------------------------
 	r.POST("/import", Import)               // 都道府県感染者オープンAPIをimport
 	r.POST("/importmedical", ImportMedical) // 都道府県感染者オープンAPIをimport
 
@@ -264,7 +222,6 @@ func AverageNpatientsOver(c *gin.Context) {
 
 func FirstFirst(c *gin.Context) {
 
-	// Open database connection
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -272,34 +229,26 @@ func FirstFirst(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// Parse date from request parameter
 	date, err := time.Parse("2006-01-02", c.Param("date"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
 
-	// Calculate previous dates
 	prevDate := date.AddDate(0, 0, -1)
 	prev2Date := date.AddDate(0, 0, -2)
 
-	// Initialize slice to store results
 	infections := []diff_Npatients_Place{}
-	// Create a WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
-	// Iterate through places and retrieve data
 	places := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
 	for _, place := range places {
-		// Launch a goroutine to retrieve data for current and previous dates
 		wg.Add(1)
 		go func(place string) {
-			defer wg.Done() // Decrement the WaitGroup counter when the goroutine finishes
+			defer wg.Done()
 
-			// Initialize struct to store results
 			npatients := diff_Npatients_Place{NameJp: place}
 
-			// Retrieve data for current and previous dates
 			err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&npatients.Npatients)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -322,15 +271,11 @@ func FirstFirst(c *gin.Context) {
 			} else {
 				npatients.Message = "attention"
 			}
-			// Append results to slice
 			infections = append(infections, npatients)
 		}(place)
 	}
-
-	// Wait for all goroutines to finish
 	wg.Wait()
 
-	// Return results
 	c.JSON(http.StatusOK, infections)
 }
 
@@ -340,7 +285,6 @@ func FirstFirst(c *gin.Context) {
 
 func FirstSecond(c *gin.Context) {
 
-	// Open database connection
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -348,34 +292,26 @@ func FirstSecond(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// Parse date from request parameter
 	date, err := time.Parse("2006-01-02", c.Param("date"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
 
-	// Calculate previous dates
 	prevDate := date.AddDate(0, 0, -1)
 	prev2Date := date.AddDate(0, 0, -2)
 
-	// Initialize slice to store results
 	infections := []diff_Npatients_Place_Per{}
-	// Create a WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
-	// Iterate through places and retrieve data
 	places := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
 	for _, place := range places {
-		// Launch a goroutine to retrieve data for current and previous dates
 		wg.Add(1)
 		go func(place string) {
-			defer wg.Done() // Decrement the WaitGroup counter when the goroutine finishes
+			defer wg.Done()
 
-			// Initialize struct to store results
 			npatients := diff_Npatients_Place_Per{NameJp: place}
 
-			// Retrieve data for current and previous dates
 			err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&npatients.Npatients)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -402,15 +338,12 @@ func FirstSecond(c *gin.Context) {
 			} else {
 				npatients.Message = "attention"
 			}
-			// Append results to slice
 			infections = append(infections, npatients)
 		}(place)
 	}
 
-	// Wait for all goroutines to finish
 	wg.Wait()
 
-	// Return results
 	c.JSON(http.StatusOK, infections)
 }
 
@@ -507,14 +440,12 @@ func SecondFirst(c *gin.Context) {
 	wg.Add(7)
 	wg.Wait()
 
-	// 取得した感染者数を配列に格納する
 	infections := []infection{infection1, infection2, infection3, infection4, infection5, infection6, infection7}
 
 	c.JSON(http.StatusOK, infections)
 }
 
 func DiffAdd(c *gin.Context) {
-	// データベースへの接続
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -543,11 +474,9 @@ func DiffAdd(c *gin.Context) {
 	var diff5 diff_Npatients
 	var diff6 diff_Npatients
 
-	// Goroutineを開始
 	var wg sync.WaitGroup
 	wg.Add(6)
 	go func() {
-		// SELECT文を実行
 		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&diff1.Npatients)
 		if err != nil {
 			log.Fatal(err)
@@ -555,7 +484,6 @@ func DiffAdd(c *gin.Context) {
 		wg.Done()
 	}()
 	go func() {
-		// SELECT文を実行
 		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prevDate, place, prev2Date, place).Scan(&diff2.Npatients)
 		if err != nil {
 			log.Fatal(err)
@@ -563,7 +491,6 @@ func DiffAdd(c *gin.Context) {
 		wg.Done()
 	}()
 	go func() {
-		// SELECT文を実行
 		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev2Date, place, prev3Date, place).Scan(&diff3.Npatients)
 		if err != nil {
 			log.Fatal(err)
@@ -571,7 +498,6 @@ func DiffAdd(c *gin.Context) {
 		wg.Done()
 	}()
 	go func() {
-		// SELECT文を実行
 		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev3Date, place, prev4Date, place).Scan(&diff4.Npatients)
 		if err != nil {
 			log.Fatal(err)
@@ -579,7 +505,6 @@ func DiffAdd(c *gin.Context) {
 		wg.Done()
 	}()
 	go func() {
-		// SELECT文を実行
 		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev4Date, place, prev5Date, place).Scan(&diff5.Npatients)
 		if err != nil {
 			log.Fatal(err)
@@ -587,7 +512,6 @@ func DiffAdd(c *gin.Context) {
 		wg.Done()
 	}()
 	go func() {
-		// SELECT文を実行
 		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev5Date, place, prev6Date, place).Scan(&diff6.Npatients)
 		if err != nil {
 			log.Fatal(err)
@@ -645,20 +569,16 @@ func SecondThird(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// Get the date and place parameters from the request
 	date := c.Param("date")
 	place := c.Param("place")
 
-	// Query the database for the requested data
 	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ? order by date ASC", place, date+"%")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Initialize an array to hold the results
 	var resultInfection []infection
 
-	// Iterate over the rows and append each infection to the results array
 	for rows.Next() {
 		infection := infection{}
 		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
@@ -667,7 +587,6 @@ func SecondThird(c *gin.Context) {
 		resultInfection = append(resultInfection, infection)
 	}
 
-	// Return the results as JSON
 	c.JSON(http.StatusOK, resultInfection)
 }
 
@@ -724,7 +643,6 @@ func Create(c *gin.Context) {
 }
 
 func Show(c *gin.Context) {
-	// データベースに接続
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
@@ -732,14 +650,12 @@ func Show(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// パラメーターからIDを取得
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
 		return
 	}
 
-	// イベントを取得
 	var json Event_JSON
 	err = db.QueryRow("SELECT title, description, begin, end FROM events WHERE id = ?", id).Scan(&json.Title, &json.Description, &json.Begin, &json.End)
 	if err != nil {
@@ -751,12 +667,10 @@ func Show(c *gin.Context) {
 		return
 	}
 
-	// イベントをJSONで出力
 	c.JSON(http.StatusOK, json)
 }
 
 func ShowAll(c *gin.Context) {
-	// データベースに接続
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
@@ -764,7 +678,6 @@ func ShowAll(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// イベントを取得
 	rows, err := db.Query("SELECT title, description, begin, end FROM events")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
@@ -786,7 +699,6 @@ func ShowAll(c *gin.Context) {
 }
 
 func Update(c *gin.Context) {
-	// データベースに接続
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
@@ -794,21 +706,18 @@ func Update(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// JSONをバインド
 	var json Event_JSON
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"}) // 400
 		return
 	}
 
-	// パラメーターからIDを取得
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
 		return
 	}
 
-	// イベントを更新
 	update, err := db.Prepare("UPDATE events SET title = ?, description = ?, begin = ?, end = ? WHERE id = ?")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
@@ -823,7 +732,6 @@ func Update(c *gin.Context) {
 }
 
 func Delete(c *gin.Context) {
-	// データベースに接続
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
@@ -831,14 +739,12 @@ func Delete(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// パラメーターからIDを取得
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
 		return
 	}
 
-	// イベントを削除
 	delete, err := db.Prepare("DELETE FROM events WHERE id = ?")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
@@ -922,7 +828,7 @@ func Validate() *validator.Validate {
 	return validate
 }
 
-func Import(c *gin.Context) { // データ取得、データベースに保存
+func Import(c *gin.Context) {
 	log.Print("データ取り込み中")
 	url := "https://opendata.corona.go.jp/api/Covid19JapanAll"
 	resp, _ := http.Get(url)
@@ -962,7 +868,7 @@ func Import(c *gin.Context) { // データ取得、データベースに保存
 	log.Print("データ取り込み完了")
 }
 
-func ImportMedical(c *gin.Context) { // データ取得、データベースに保存
+func ImportMedical(c *gin.Context) {
 	log.Print("データ取り込み中")
 	// JSONデータを取得する
 	resp, err := http.Get("https://opendata.corona.go.jp/api/covid19DailySurvey")
@@ -976,13 +882,11 @@ func ImportMedical(c *gin.Context) { // データ取得、データベースに�
 		panic(err)
 	}
 
-	// JSONデータを解析する
 	var records []Medical
 	if err := json.Unmarshal(byteArray, &records); err != nil {
 		panic(err)
 	}
 
-	// MySQL に接続する
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		panic(err)
@@ -1014,5 +918,3 @@ func ImportMedical(c *gin.Context) { // データ取得、データベースに�
 
 	log.Print("データ取り込み完了")
 }
-
-// ------------------------------------------------------------------------------------------------------------------------------
