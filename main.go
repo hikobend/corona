@@ -33,6 +33,20 @@ type Medical struct {
 	FacilityCode string `json:"facilityCode"`
 }
 
+type Medicals struct {
+	FacilityName string `json:"facilityName"` // 病院名
+	ZipCode      string `json:"zipCode"`      // 郵便番号
+	PrefName     string `json:"prefName"`     // 都道府県
+	FacilityAddr string `json:"facilityAddr"` // 場所
+	FacilityTel  string `json:"facilityTel"`  // 電話番号
+	SubmitDate   string `json:"submitDate"`   // 日付
+	FacilityType string `json:"facilityType"`
+	AnsType      string `json:"ansType"`
+	LocalGovCode string `json:"localGovCode"`
+	CityName     string `json:"cityName"`
+	FacilityCode string `json:"facilityCode"`
+}
+
 type Npatients struct {
 	ErrorInfo struct {
 		ErrorFlag    string `json:"errorFlag"`
