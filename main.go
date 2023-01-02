@@ -16,18 +16,21 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
-type Deceased struct {
-	ErrorInfo struct {
-		ErrorFlag    string      `json:"errorFlag"`
-		ErrorCode    interface{} `json:"errorCode"`
-		ErrorMessage interface{} `json:"errorMessage"`
-	} `json:"errorInfo"`
-	ItemList []struct {
-		Date        string `json:"date"`
-		DataName    string `json:"dataName"`
-		InfectedNum string `json:"infectedNum"`
-		DeceasedNum string `json:"deceasedNum"`
-	} `json:"itemList"`
+type Medical []struct {
+	FacilityID   string `json:"facilityId"`
+	FacilityName string `json:"facilityName"`
+	ZipCode      string `json:"zipCode"`
+	PrefName     string `json:"prefName"`
+	FacilityAddr string `json:"facilityAddr"`
+	FacilityTel  string `json:"facilityTel"`
+	Latitude     string `json:"latitude"`
+	Longitude    string `json:"longitude"`
+	SubmitDate   string `json:"submitDate"`
+	FacilityType string `json:"facilityType"`
+	AnsType      string `json:"ansType"`
+	LocalGovCode string `json:"localGovCode"`
+	CityName     string `json:"cityName"`
+	FacilityCode string `json:"facilityCode"`
 }
 
 type Npatients struct {
@@ -166,7 +169,6 @@ func main() {
 	r.GET("/leastattachday/:place/:count", LeastAttachDay)                    // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
 	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)     // 年と都道府県を取得して、その年の平均感染者数を取得
 	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)   // 年月と都道府県を取得して、その月の平均感染者数を取得
-	r.POST("/importdeceased", ImportDeceased)                                 // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                   // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
 	r.GET("/npatientsthreedayall/:date", TheDayBeforeRatioPatientsAll)        // 日付を選択し、3日間の感染者を取得 47都道府県
 	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceAsc)                 // 日付を選択して、感染者が少ない順に表示
@@ -1589,43 +1591,43 @@ func GetDateNpatients(c *gin.Context) {
 
 }
 
-func ImportDeceased(c *gin.Context) { // データ取得、データベースに保存
-	log.Print("データ取り込み中")
-	url := "https://opendata.corona.go.jp/api/OccurrenceStatusOverseas"
-	resp, _ := http.Get(url)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
-	byteArray, _ := ioutil.ReadAll(resp.Body)
+// func ImportDeceased(c *gin.Context) { // データ取得、データベースに保存
+// 	log.Print("データ取り込み中")
+// 	url := "https://opendata.corona.go.jp/api/OccurrenceStatusOverseas"
+// 	resp, _ := http.Get(url)
+// 	if resp != nil {
+// 		defer resp.Body.Close()
+// 	}
+// 	byteArray, _ := ioutil.ReadAll(resp.Body)
 
-	jsonBytes := ([]byte)(byteArray)
-	data := new(Deceased)
+// 	jsonBytes := ([]byte)(byteArray)
+// 	data := new(Deceased)
 
-	if err := json.Unmarshal(jsonBytes, data); err != nil {
-		fmt.Println("JSON Unmarshal error:", err)
-		return
-	}
-	// fmt.Println(data.ItemList)
+// 	if err := json.Unmarshal(jsonBytes, data); err != nil {
+// 		fmt.Println("JSON Unmarshal error:", err)
+// 		return
+// 	}
+// 	// fmt.Println(data.ItemList)
 
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+// 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer db.Close()
 
-	delete, err := db.Prepare("DELETE FROM decease")
-	if err != nil {
-		log.Fatal(err)
-	}
-	delete.Exec()
+// 	delete, err := db.Prepare("DELETE FROM decease")
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	delete.Exec()
 
-	for _, v := range data.ItemList {
-		insert, err := db.Prepare("INSERT INTO decease(date, data_name, infected_num, deceased_num) values (?,?,?,?)")
-		if err != nil {
-			log.Fatal(err)
-		}
-		insert.Exec(v.Date, v.DataName, v.InfectedNum, v.DeceasedNum)
-	}
+// 	for _, v := range data.ItemList {
+// 		insert, err := db.Prepare("INSERT INTO decease(date, data_name, infected_num, deceased_num) values (?,?,?,?)")
+// 		if err != nil {
+// 			log.Fatal(err)
+// 		}
+// 		insert.Exec(v.Date, v.DataName, v.InfectedNum, v.DeceasedNum)
+// 	}
 
-	log.Print("データ取り込み完了")
-}
+// 	log.Print("データ取り込み完了")
+// }
