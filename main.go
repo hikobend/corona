@@ -74,6 +74,10 @@ func main() {
 	// 1
 	// ----------------------------------
 
+	// -------------
+	// 1 - 1
+	// -------------
+
 	r.GET("/firstfirst/:date", FirstFirst) // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
 
 	// ----------------------------------
@@ -94,20 +98,36 @@ func main() {
 	// 1ヶ月の推移を表示
 	r.GET("/npatientsinmonth/:place/:date", SecondSecond) // 年月と都道府県を取得して、その月の感染者数推移を取得
 
+	// -------------
+	// 2 - 3
+	// -------------
+
+	r.GET("/npatientsinyear/:place/:date", SecondThird) // 年と都道府県を取得して、その年の感染者推移を取得
+
+	// ----------------------------------
+	// 3
+	// ----------------------------------
+
+	// -------------
+	// 3 - 1
+	// -------------
+
+	// イベントのCRUD
+
+	r.POST("/create", Create)       // コロナに関するメモを追加
+	r.GET("/show/:id", Show)        // コロナに関するメモを表示 -> 日程の感染者数の推移を表示したい -> ボタンを設置してGetInfectionByDateに飛ばせないか？
+	r.GET("/shows", ShowAll)        // コロナに関するメモを表示
+	r.PATCH("/show/:id", Update)    // コロナに関するメモを変更
+	r.DELETE("/delete/:id", Delete) // コロナに関するメモを削除
+
 	r.GET("/areanpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する
 	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)             // 地方と日付を入力して、感染者の平均を取得する
 	r.GET("/areaaveragenpatientsover/:place/:date", AreaAverageNpatientsOver)     // 地方と日付を入力して、感染者の平均超えている都道府県を取得する
 	r.GET("/leastattachday/:place/:count", LeastAttachDay)                        // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
-	r.GET("/npatientsinyear/:place/:date", NpatientsInYear)                       // 年と都道府県を取得して、その年の感染者推移を取得
 	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)         // 年と都道府県を取得して、その年の平均感染者数を取得
 	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)       // 年月と都道府県を取得して、その月の平均感染者数を取得
 	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
 	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
-	r.POST("/create", Create)                                                     // コロナに関するメモを追加
-	r.GET("/show/:id", Show)                                                      // コロナに関するメモを表示 -> 日程の感染者数の推移を表示したい -> ボタンを設置してGetInfectionByDateに飛ばせないか？
-	r.GET("/shows", ShowAll)                                                      // コロナに関するメモを表示
-	r.PATCH("/show/:id", Update)                                                  // コロナに関するメモを変更
-	r.DELETE("/delete/:id", Delete)                                               // コロナに関するメモを削除
 	r.POST("/import", Import)                                                     // データをimport
 	r.POST("/importdeceased", ImportDeceased)                                     // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
@@ -129,9 +149,17 @@ func main() {
 	r.Run()
 }
 
+// -------------
+// 1 - 1
+// -------------
+
 func FirstFirst(c *gin.Context) {
 
 }
+
+// -------------
+// 2 - 1
+// -------------
 
 func SecondFirst(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
@@ -316,6 +344,10 @@ func DiffAdd(c *gin.Context) {
 	c.JSON(http.StatusOK, infections)
 }
 
+// -------------
+// 2 - 2
+// -------------
+
 func SecondSecond(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
@@ -342,6 +374,215 @@ func SecondSecond(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resultInfection)
 
+}
+
+// -------------
+// 2 - 3
+// -------------
+
+func SecondThird(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+	place := c.Param("place")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ? order by date ASC", place, date+"%")
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
+}
+
+func Create(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	var json Event_JSON
+	validate := Validate() //インスタンス生成
+
+	if err := c.ShouldBindJSON(&json); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// yyyymmdd形式の文字列をtime.Time型に変換
+	layout := "20060102"
+	t, err := time.Parse(layout, json.Begin)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// yyyymmdd形式の文字列をtime.Time型に変換
+	t2, err := time.Parse(layout, json.End)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err = validate.Struct(&json); err != nil { //バリデーションを実行し、NGの場合、ここでエラーが返る。
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
+
+	insert, err := db.Prepare("INSERT INTO events (title, description, begin, end) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer insert.Close()
+
+	// パラメータを設定してクエリを実行
+	_, err = insert.Exec(json.Title, json.Description, t.Format("2006-01-02"), t2.Format("2006-01-02"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+}
+
+func Show(c *gin.Context) {
+	// データベースに接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	// パラメーターからIDを取得
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
+	}
+
+	// イベントを取得
+	var json Event_JSON
+	err = db.QueryRow("SELECT title, description, begin, end FROM events WHERE id = ?", id).Scan(&json.Title, &json.Description, &json.Begin, &json.End)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "event not found"}) // 404
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// イベントをJSONで出力
+	c.JSON(http.StatusOK, json)
+}
+
+func ShowAll(c *gin.Context) {
+	// データベースに接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	// イベントを取得
+	rows, err := db.Query("SELECT title, description, begin, end FROM events")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer rows.Close()
+
+	var result []Event_JSON
+	for rows.Next() {
+		var json Event_JSON
+		if err := rows.Scan(&json.Title, &json.Description, &json.Begin, &json.End); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+			return
+		}
+		result = append(result, json)
+	}
+
+	c.JSON(http.StatusOK, result) // 200
+}
+
+func Update(c *gin.Context) {
+	// データベースに接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	// JSONをバインド
+	var json Event_JSON
+	if err := c.ShouldBindJSON(&json); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"}) // 400
+		return
+	}
+
+	// パラメーターからIDを取得
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
+	}
+
+	// イベントを更新
+	update, err := db.Prepare("UPDATE events SET title = ?, description = ?, begin = ?, end = ? WHERE id = ?")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	if _, err := update.Exec(json.Title, json.Description, json.Begin, json.End, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+
+	c.Status(http.StatusOK) // 200
+}
+
+func Delete(c *gin.Context) {
+	// データベースに接続
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	defer db.Close()
+
+	// パラメーターからIDを取得
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
+	}
+
+	// イベントを削除
+	delete, err := db.Prepare("DELETE FROM events WHERE id = ?")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+	if _, err := delete.Exec(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+		return
+	}
+
+	c.Status(http.StatusOK) // 200
 }
 
 func AreaAverageNpatientsOver(c *gin.Context) {
@@ -535,34 +776,6 @@ func AverageNpatientsInYear(c *gin.Context) {
 		"place":     place,
 		"npatients": avg,
 	})
-}
-
-func NpatientsInYear(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ?", place, date+"%")
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
 }
 
 func LeastAttachDay(c *gin.Context) {
@@ -766,183 +979,6 @@ func Diff(c *gin.Context) {
 		})
 
 	}
-}
-
-func Create(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	var json Event_JSON
-	validate := Validate() //インスタンス生成
-
-	if err := c.ShouldBindJSON(&json); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// yyyymmdd形式の文字列をtime.Time型に変換
-	layout := "20060102"
-	t, err := time.Parse(layout, json.Begin)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// yyyymmdd形式の文字列をtime.Time型に変換
-	t2, err := time.Parse(layout, json.End)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err = validate.Struct(&json); err != nil { //バリデーションを実行し、NGの場合、ここでエラーが返る。
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	}
-
-	insert, err := db.Prepare("INSERT INTO events (title, description, begin, end) VALUES (?, ?, ?, ?)")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer insert.Close()
-
-	// パラメータを設定してクエリを実行
-	_, err = insert.Exec(json.Title, json.Description, t.Format("2006-01-02"), t2.Format("2006-01-02"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	}
-}
-
-func Show(c *gin.Context) {
-	// データベースに接続
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer db.Close()
-
-	// パラメーターからIDを取得
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
-		return
-	}
-
-	// イベントを取得
-	var json Event_JSON
-	err = db.QueryRow("SELECT title, description, begin, end FROM events WHERE id = ?", id).Scan(&json.Title, &json.Description, &json.Begin, &json.End)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "event not found"}) // 404
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// イベントをJSONで出力
-	c.JSON(http.StatusOK, json)
-}
-
-func ShowAll(c *gin.Context) {
-	// データベースに接続
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer db.Close()
-
-	// イベントを取得
-	rows, err := db.Query("SELECT title, description, begin, end FROM events")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer rows.Close()
-
-	var result []Event_JSON
-	for rows.Next() {
-		var json Event_JSON
-		if err := rows.Scan(&json.Title, &json.Description, &json.Begin, &json.End); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-		result = append(result, json)
-	}
-
-	c.JSON(http.StatusOK, result) // 200
-}
-
-func Update(c *gin.Context) {
-	// データベースに接続
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer db.Close()
-
-	// JSONをバインド
-	var json Event_JSON
-	if err := c.ShouldBindJSON(&json); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"}) // 400
-		return
-	}
-
-	// パラメーターからIDを取得
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
-		return
-	}
-
-	// イベントを更新
-	update, err := db.Prepare("UPDATE events SET title = ?, description = ?, begin = ?, end = ? WHERE id = ?")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	if _, err := update.Exec(json.Title, json.Description, json.Begin, json.End, id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-
-	c.Status(http.StatusOK) // 200
-}
-
-func Delete(c *gin.Context) {
-	// データベースに接続
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer db.Close()
-
-	// パラメーターからIDを取得
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
-		return
-	}
-
-	// イベントを削除
-	delete, err := db.Prepare("DELETE FROM events WHERE id = ?")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	if _, err := delete.Exec(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-
-	c.Status(http.StatusOK) // 200
 }
 
 func AverageNpatientsOver(c *gin.Context) {
@@ -1328,7 +1364,6 @@ func Import(c *gin.Context) { // データ取得、データベースに保存
 		fmt.Println("JSON Unmarshal error:", err)
 		return
 	}
-	// fmt.Println(data.ItemList)
 
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
