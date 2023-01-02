@@ -153,7 +153,7 @@ func main() {
 	r.GET("/getnpatients/:place/:date1/:date2", ThirdThird) // 期間を選択し、感染者を取得
 
 	// データimport
-	r.POST("/import", Import) // データをimport
+	r.POST("/import", Import) // 都道府県感染者オープンAPIをimport
 
 	// ----------------------------------
 	// 不要候補
@@ -839,6 +839,51 @@ func ThirdThird(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resultInfection)
 
+}
+
+func Validate() *validator.Validate {
+	validate := validator.New()
+	return validate
+}
+
+func Import(c *gin.Context) { // データ取得、データベースに保存
+	log.Print("データ取り込み中")
+	url := "https://opendata.corona.go.jp/api/Covid19JapanAll"
+	resp, _ := http.Get(url)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	byteArray, _ := ioutil.ReadAll(resp.Body)
+
+	jsonBytes := ([]byte)(byteArray)
+	data := new(Npatients)
+
+	if err := json.Unmarshal(jsonBytes, data); err != nil {
+		fmt.Println("JSON Unmarshal error:", err)
+		return
+	}
+
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	delete, err := db.Prepare("DELETE FROM infection")
+	if err != nil {
+		log.Fatal(err)
+	}
+	delete.Exec()
+
+	for _, v := range data.ItemList {
+		insert, err := db.Prepare("INSERT INTO infection(date, name_jp, npatients) values (?,?,?)")
+		if err != nil {
+			log.Fatal(err)
+		}
+		insert.Exec(v.Date, v.NameJp, v.Npatients)
+	}
+
+	log.Print("データ取り込み完了")
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
@@ -1542,51 +1587,6 @@ func GetDateNpatients(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, infection)
 
-}
-
-func Validate() *validator.Validate {
-	validate := validator.New()
-	return validate
-}
-
-func Import(c *gin.Context) { // データ取得、データベースに保存
-	log.Print("データ取り込み中")
-	url := "https://opendata.corona.go.jp/api/Covid19JapanAll"
-	resp, _ := http.Get(url)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
-	byteArray, _ := ioutil.ReadAll(resp.Body)
-
-	jsonBytes := ([]byte)(byteArray)
-	data := new(Npatients)
-
-	if err := json.Unmarshal(jsonBytes, data); err != nil {
-		fmt.Println("JSON Unmarshal error:", err)
-		return
-	}
-
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	delete, err := db.Prepare("DELETE FROM infection")
-	if err != nil {
-		log.Fatal(err)
-	}
-	delete.Exec()
-
-	for _, v := range data.ItemList {
-		insert, err := db.Prepare("INSERT INTO infection(date, name_jp, npatients) values (?,?,?)")
-		if err != nil {
-			log.Fatal(err)
-		}
-		insert.Exec(v.Date, v.NameJp, v.Npatients)
-	}
-
-	log.Print("データ取り込み完了")
 }
 
 func ImportDeceased(c *gin.Context) { // データ取得、データベースに保存
