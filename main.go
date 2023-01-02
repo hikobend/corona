@@ -326,7 +326,7 @@ func SecondSecond(c *gin.Context) {
 	date := c.Param("date")
 	place := c.Param("place")
 
-	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ?", place, date+"%")
+	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ? ORDER BY date ASC", place, date+"%")
 	if err != nil {
 		log.Fatal(err)
 	}
