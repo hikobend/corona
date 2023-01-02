@@ -173,30 +173,89 @@ func main() {
 	r.POST("/import", Import)               // 都道府県感染者オープンAPIをimport
 	r.POST("/importmedical", ImportMedical) // 都道府県感染者オープンAPIをimport
 
-	// ----------------------------------
-	// 不要候補
-	// ----------------------------------
-
-	r.GET("/diff/:place/:date1/:date2", Diff)                                 // 前日比を表示
-	r.GET("/areanpatients/:place/:date", AreaNpatients)                       // 地方と日付を入力して、感染者を取得する
-	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)         // 地方と日付を入力して、感染者の平均を取得する
-	r.GET("/areaaveragenpatientsover/:place/:date", AreaAverageNpatientsOver) // 地方と日付を入力して、感染者の平均超えている都道府県を取得する
-	r.GET("/leastattachday/:place/:count", LeastAttachDay)                    // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
-	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)     // 年と都道府県を取得して、その年の平均感染者数を取得
-	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)   // 年月と都道府県を取得して、その月の平均感染者数を取得
-	r.GET("/get/:date", GetInfectionByDate)                                   // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
-	r.GET("/npatientsthreedayall/:date", TheDayBeforeRatioPatientsAll)        // 日付を選択し、3日間の感染者を取得 47都道府県
-	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceAsc)                 // 日付を選択して、感染者が少ない順に表示
-	r.GET("/getnpatientsdesc/:date", GetNpatientsWithPlaceDesc)               // 日付を選択して、感染者が多い順に表示
-	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)        // 日付と都道府県を選択し、感染者を取得
-	r.GET("/npatients/:place/:date", GetDateNpatients)                        // 日付と地域を選択し、感染者を取得
-	r.GET("/npatientsthreeday/:place/:date", TheDayBeforeRatioPatients)       // 日付と地域を選択し、3日間の感染者を取得
-	r.GET("/setnpatientsasc/:date/:count", SetNpatientsAsc)                   // 日付と感染者を入力して、感染者が上回った都道府県を少ない順に表示
-	r.GET("/setnpatientsdesc/:date/:count", SetNpatientsDesc)                 // 日付と感染者を入力して、感染者が上回った都道府県を多い順に表示
-	r.GET("/setnpatientsunderasc/:date/:count", SetNpatientsUnderAsc)         // 日付と感染者を入力して、感染者が下回った都道府県を少ない順に表示
-	r.GET("/setnpatientsunderdesc/:date/:count", SetNpatientsUnderDesc)       // 日付と感染者を入力して、感染者が下回った都道府県を多い順に表示
-
 	r.Run()
+}
+
+func CountOfPatients(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+
+	var sum int
+	err = db.QueryRow("select sum(npatients) from infection where date = ?", date).Scan(&sum)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 結果をJSONで出力
+	c.JSON(http.StatusOK, gin.H{
+		"date":      date,
+		"npatients": sum,
+	})
+}
+
+func AverageNpatients(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients > (select avg(npatients) from infection)", date)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
+}
+
+func AverageNpatientsOver(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients < (select avg(npatients) from infection)", date)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 // -------------
@@ -957,704 +1016,3 @@ func ImportMedical(c *gin.Context) { // データ取得、データベースに�
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
-
-func AreaAverageNpatientsOver(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place")
-
-	var rows *sql.Rows
-
-	switch place {
-	case "北海道":
-		rows, err = db.Query("select date, name_jp, npatients from infection where name_jp = '北海道' and date = ? and npatients > (select avg(npatients) from infection where name_jp = '北海道' and date = ?)", date, date)
-
-	case "東北":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = ? and npatients > (select avg(npatients) from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = ?)", date, date)
-
-	case "関東":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '茨城県' or name_jp = '栃木県' or name_jp = '群馬県' or name_jp = '埼玉県' or name_jp ='千葉県' or name_jp = '東京都' or name_jp = '神奈川県') and date = ? and npatients > (select avg(npatients) from infection where (name_jp = '茨城県' or name_jp = '栃木県' or name_jp = '群馬県' or name_jp = '埼玉県' or name_jp ='千葉県' or name_jp = '東京都' or name_jp = '神奈川県') and date = ?)", date, date)
-
-	case "中部":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '新潟県' or name_jp = '富山県' or name_jp = '石川県' or name_jp = '福井県' or name_jp ='山梨県' or name_jp = '長野県' or name_jp = '岐阜県' or name_jp = '静岡県' or name_jp = '愛知県') and date = ? and npatients > (select avg(npatients) from infection where (name_jp = '新潟県' or name_jp = '富山県' or name_jp = '石川県' or name_jp = '福井県' or name_jp ='山梨県' or name_jp = '長野県' or name_jp = '岐阜県' or name_jp = '静岡県' or name_jp = '愛知県') and date = ?)", date, date)
-
-	case "近畿":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '三重県' or name_jp = '滋賀県' or name_jp = '京都府' or name_jp = '大阪府' or name_jp ='兵庫県' or name_jp = '奈良県' or name_jp = '和歌山県') and date = ? and npatients > (select avg(npatients) from infection where (name_jp = '三重県' or name_jp = '滋賀県' or name_jp = '京都府' or name_jp = '大阪府' or name_jp ='兵庫県' or name_jp = '奈良県' or name_jp = '和歌山県') and date = ?)", date, date)
-
-	case "中国":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '鳥取県' or name_jp = '島根県' or name_jp = '岡山県' or name_jp = '広島県' or name_jp ='山口県') and date = ? and npatients > (select avg(npatients) from infection where (name_jp = '鳥取県' or name_jp = '島根県' or name_jp = '岡山県' or name_jp = '広島県' or name_jp ='山口県') and date = ?)", date, date)
-
-	case "四国":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '徳島県' or name_jp = '香川県' or name_jp = '愛媛県' or name_jp = '高知県') and date = ? and npatients > (select avg(npatients) from infection where (name_jp = '徳島県' or name_jp = '香川県' or name_jp = '愛媛県' or name_jp = '高知県') and date = ?)", date, date)
-
-	case "九州":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '福岡県' or name_jp = '佐賀県' or name_jp = '長崎県' or name_jp = '熊本県' or name_jp ='大分県' or name_jp = '宮崎県' or name_jp = '鹿児島県' or name_jp = '沖縄県') and date = ? and npatients > (select avg(npatients) from infection where (name_jp = '福岡県' or name_jp = '佐賀県' or name_jp = '長崎県' or name_jp = '熊本県' or name_jp ='大分県' or name_jp = '宮崎県' or name_jp = '鹿児島県' or name_jp = '沖縄県') and date = ?)", date, date)
-	}
-	// インフェクションを取得
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer rows.Close()
-
-	var result []infection
-	for rows.Next() {
-		var inf infection
-		if err := rows.Scan(&inf.Date, &inf.NameJp, &inf.Npatients); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-		result = append(result, inf)
-	}
-
-	c.JSON(http.StatusOK, result) // 200
-}
-
-func AreaAverageNpatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place")
-
-	var avg float64
-
-	switch place {
-	case "北海道":
-		err = db.QueryRow("select avg(npatients) from infection where name_jp = '北海道' and date = ?", date).Scan(&avg)
-
-	case "東北":
-		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = ?", date).Scan(&avg)
-
-	case "関東":
-		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '茨城県' or name_jp = '栃木県' or name_jp = '群馬県' or name_jp = '埼玉県' or name_jp ='千葉県' or name_jp = '東京都' or name_jp = '神奈川県') and date = ?", date).Scan(&avg)
-
-	case "中部":
-		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '新潟県' or name_jp = '富山県' or name_jp = '石川県' or name_jp = '福井県' or name_jp ='山梨県' or name_jp = '長野県' or name_jp = '岐阜県' or name_jp = '静岡県' or name_jp = '愛知県') and date = ?", date).Scan(&avg)
-
-	case "近畿":
-		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '三重県' or name_jp = '滋賀県' or name_jp = '京都府' or name_jp = '大阪府' or name_jp ='兵庫県' or name_jp = '奈良県' or name_jp = '和歌山県') and date = ?", date).Scan(&avg)
-
-	case "中国":
-		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '鳥取県' or name_jp = '島根県' or name_jp = '岡山県' or name_jp = '広島県' or name_jp ='山口県') and date = ?", date).Scan(&avg)
-
-	case "四国":
-		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '徳島県' or name_jp = '香川県' or name_jp = '愛媛県' or name_jp = '高知県') and date = ?", date).Scan(&avg)
-
-	case "九州":
-		err = db.QueryRow("select avg(npatients) from infection where (name_jp = '福岡県' or name_jp = '佐賀県' or name_jp = '長崎県' or name_jp = '熊本県' or name_jp ='大分県' or name_jp = '宮崎県' or name_jp = '鹿児島県' or name_jp = '沖縄県') and date = ?", date).Scan(&avg)
-	}
-	// インフェクションを取得
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		// "month":     date,
-		// "place":     place,
-		"npatients": avg,
-	})
-}
-
-func AreaNpatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place")
-
-	var rows *sql.Rows
-
-	switch place {
-	case "北海道":
-		rows, err = db.Query("select date, name_jp, npatients from infection where name_jp = '北海道' and date = ?", date)
-
-	case "東北":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '青森県' or name_jp = '岩手県' or name_jp = '宮城県' or name_jp = '秋田県' or name_jp ='山形県' or name_jp = '福島県') and date = ?", date)
-
-	case "関東":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '茨城県' or name_jp = '栃木県' or name_jp = '群馬県' or name_jp = '埼玉県' or name_jp ='千葉県' or name_jp = '東京都' or name_jp = '神奈川県') and date = ?", date)
-
-	case "中部":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '新潟県' or name_jp = '富山県' or name_jp = '石川県' or name_jp = '福井県' or name_jp ='山梨県' or name_jp = '長野県' or name_jp = '岐阜県' or name_jp = '静岡県' or name_jp = '愛知県') and date = ?", date)
-
-	case "近畿":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '三重県' or name_jp = '滋賀県' or name_jp = '京都府' or name_jp = '大阪府' or name_jp ='兵庫県' or name_jp = '奈良県' or name_jp = '和歌山県') and date = ?", date)
-
-	case "中国":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '鳥取県' or name_jp = '島根県' or name_jp = '岡山県' or name_jp = '広島県' or name_jp ='山口県') and date = ?", date)
-
-	case "四国":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '徳島県' or name_jp = '香川県' or name_jp = '愛媛県' or name_jp = '高知県') and date = ?", date)
-
-	case "九州":
-		rows, err = db.Query("select date, name_jp, npatients from infection where (name_jp = '福岡県' or name_jp = '佐賀県' or name_jp = '長崎県' or name_jp = '熊本県' or name_jp ='大分県' or name_jp = '宮崎県' or name_jp = '鹿児島県' or name_jp = '沖縄県') and date = ?", date)
-	}
-	// インフェクションを取得
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer rows.Close()
-
-	var result []infection
-	for rows.Next() {
-		var inf infection
-		if err := rows.Scan(&inf.Date, &inf.NameJp, &inf.Npatients); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-		result = append(result, inf)
-	}
-
-	c.JSON(http.StatusOK, result) // 200
-}
-
-func AverageNpatientsInYear(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place")
-
-	// SQLを実行
-	var avg float64
-	err = db.QueryRow("select avg(npatients) from infection where name_jp = ? and date like ?", place, date+"%").Scan(&avg)
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"year":      date,
-		"place":     place,
-		"npatients": avg,
-	})
-}
-
-func LeastAttachDay(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-	defer db.Close()
-
-	place := c.Param("place")
-	count := c.Param("count")
-
-	// SQLを実行
-	var min time.Time
-	err = db.QueryRow("select min(date), npatients from infection where name_jp = ? and npatients > ?", place, count).Scan(&min)
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-
-	yyyymmdd := min.Format("2006-01-02")
-
-	c.JSON(http.StatusOK, gin.H{
-		"day":   yyyymmdd,
-		"place": place,
-	})
-}
-
-func AverageNpatientsInMonth(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place")
-
-	// SQLを実行
-	var avg float64
-	err = db.QueryRow("select avg(npatients) from infection where name_jp = ? and date like ?", place, date+"%").Scan(&avg)
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"month":     date,
-		"place":     place,
-		"npatients": avg,
-	})
-}
-
-func TheDayBeforeRatioPatientsAll(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date, err := time.Parse("2006-01-02", c.Param("date"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
-		return
-	}
-	prevDate := date.AddDate(0, 0, -1)
-	NextDate := date.AddDate(0, 0, 1)
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? or date = ? or date = ?", prevDate, date, NextDate)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-}
-
-func TheDayBeforeRatioPatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer db.Close()
-
-	date, err := time.Parse("2006-01-02", c.Param("date"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
-		return
-	}
-	prevDate := date.AddDate(0, 0, -1)
-	NextDate := date.AddDate(0, 0, 1)
-
-	place := c.Param("place")
-
-	var infection1 infection
-	var infection2 infection
-	var infection3 infection
-	var wg sync.WaitGroup
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, NextDate).Scan(&infection1.Date, &infection1.NameJp, &infection1.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, date).Scan(&infection2.Date, &infection2.NameJp, &infection2.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prevDate).Scan(&infection3.Date, &infection3.NameJp, &infection3.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	wg.Wait()
-
-	// 取得した感染者数を配列に格納する
-	infections := []infection{infection1, infection2, infection3}
-
-	c.JSON(http.StatusOK, infections)
-}
-
-func CountOfPatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	var sum int
-	err = db.QueryRow("select sum(npatients) from infection where date = ?", date).Scan(&sum)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 結果をJSONで出力
-	c.JSON(http.StatusOK, gin.H{
-		"date":      date,
-		"npatients": sum,
-	})
-}
-
-func Diff(c *gin.Context) {
-	// データベースへの接続
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer db.Close()
-
-	place := c.Param("place")
-	date1 := c.Param("date1")
-	date2 := c.Param("date2")
-
-	// SELECT文を実行
-	rows, err := db.Query("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date2, place, date1, place)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer rows.Close()
-
-	// 取得した値を表示
-	var diff int
-	for rows.Next() {
-		err := rows.Scan(&diff)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"begin":     date1,
-			"end":       date2,
-			"place":     place,
-			"npatients": diff,
-		})
-
-	}
-}
-
-func AverageNpatientsOver(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients < (select avg(npatients) from infection)", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func AverageNpatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients > (select avg(npatients) from infection)", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func SetNpatientsUnderDesc(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	count := c.Param("count")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients < ? order by npatients DESC", date, count)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func SetNpatientsUnderAsc(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	count := c.Param("count")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients < ? order by npatients ASC", date, count)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func SetNpatientsDesc(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	count := c.Param("count")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients > ? order by npatients DESC", date, count)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func SetNpatientsAsc(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	count := c.Param("count")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients > ? order by npatients ASC", date, count)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func GetNpatientsWithPlaceDesc(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? order by npatients DESC", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func GetNpatientsWithPlaceAsc(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? order by npatients ASC", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func GetInfectionByDateAndPlace(c *gin.Context) {
-	// データベースに接続
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer db.Close()
-
-	// パラメーターから日付と場所を取得
-	date := c.Param("date")
-	place := c.Param("place")
-
-	// インフェクションを取得
-	rows, err := db.Query("SELECT date, name_jp, npatients FROM infection WHERE date = ? AND name_jp = ?", date, place)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-		return
-	}
-	defer rows.Close()
-
-	var result []infection
-	for rows.Next() {
-		var inf infection
-		if err := rows.Scan(&inf.Date, &inf.NameJp, &inf.Npatients); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-		result = append(result, inf)
-	}
-
-	c.JSON(http.StatusOK, result) // 200
-}
-
-func GetInfectionByDate(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ?", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-}
-
-func GetDateNpatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place") // place用の別テーブルを作成して、そこのidを選択できないか。プルダウンで選択したい。
-
-	var infection infection
-
-	err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, date).Scan(&infection.Date, &infection.NameJp, &infection.Npatients)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	c.JSON(http.StatusOK, infection)
-
-}
