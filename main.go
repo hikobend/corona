@@ -71,16 +71,28 @@ func main() {
 	r := gin.Default()
 
 	// ----------------------------------
-	// 1-1
+	// 1
 	// ----------------------------------
 
 	r.GET("/firstfirst/:date", FirstFirst) // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
 
 	// ----------------------------------
-	// 2-1
+	// 2
 	// ----------------------------------
+
+	// -------------
+	// 2 - 1
+	// -------------
+
 	r.GET("/secondfirst/:place/:date", SecondFirst) // ここ7日間の感染者推移
 	r.GET("/diffadd/:place/:date", DiffAdd)         // 前日比を表示
+
+	// -------------
+	// 2 - 2
+	// -------------
+
+	// 1ヶ月の推移を表示
+	r.GET("/npatientsinmonth/:place/:date", SecondSecond) // 年月と都道府県を取得して、その月の感染者数推移を取得
 
 	r.GET("/areanpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する
 	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)             // 地方と日付を入力して、感染者の平均を取得する
@@ -88,7 +100,6 @@ func main() {
 	r.GET("/leastattachday/:place/:count", LeastAttachDay)                        // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
 	r.GET("/npatientsinyear/:place/:date", NpatientsInYear)                       // 年と都道府県を取得して、その年の感染者推移を取得
 	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)         // 年と都道府県を取得して、その年の平均感染者数を取得
-	r.GET("/npatientsinmonth/:place/:date", NpatientsInMonth)                     // 年月と都道府県を取得して、その月の感染者数推移を取得
 	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)       // 年月と都道府県を取得して、その月の平均感染者数を取得
 	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
 	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
@@ -303,6 +314,34 @@ func DiffAdd(c *gin.Context) {
 	infections := []diff_Npatients{diff1, diff2, diff3, diff4, diff5, diff6}
 
 	c.JSON(http.StatusOK, infections)
+}
+
+func SecondSecond(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date := c.Param("date")
+	place := c.Param("place")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ?", place, date+"%")
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
 }
 
 func AreaAverageNpatientsOver(c *gin.Context) {
@@ -577,34 +616,6 @@ func AverageNpatientsInMonth(c *gin.Context) {
 		"place":     place,
 		"npatients": avg,
 	})
-}
-
-func NpatientsInMonth(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-	place := c.Param("place")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ?", place, date+"%")
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
 }
 
 func TheDayBeforeRatioPatientsAll(c *gin.Context) {
