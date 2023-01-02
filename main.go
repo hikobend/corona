@@ -49,12 +49,12 @@ type infection struct {
 	Npatients int       `json:"npatients"`
 }
 
-type decease struct {
-	Date        time.Time `json:"date"`
-	DataName    string    `json:"data_name"`
-	InfectedNum int       `json:"infected_mum"`
-	DeceasedNum int       `json:"deceased_num"`
-}
+// type decease struct {
+// 	Date        time.Time `json:"date"`
+// 	DataName    string    `json:"data_name"`
+// 	InfectedNum int       `json:"infected_mum"`
+// 	DeceasedNum int       `json:"deceased_num"`
+// }
 
 type Event_JSON struct {
 	Title       string `json:"title" validate:"required"`
@@ -66,6 +66,11 @@ type Event_JSON struct {
 func main() {
 	r := gin.Default()
 
+	// ----------------------------------
+	// 1-1
+	// ----------------------------------
+
+	r.GET("/firstfirst/:date", FirstFirst)                                        // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
 	r.GET("/areanpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する
 	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)             // 地方と日付を入力して、感染者の平均を取得する
 	r.GET("/areaaveragenpatientsover/:place/:date", AreaAverageNpatientsOver)     // 地方と日付を入力して、感染者の平均超えている都道府県を取得する
@@ -100,6 +105,10 @@ func main() {
 	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
 
 	r.Run()
+}
+
+func FirstFirst(c *gin.Context) {
+
 }
 
 func AreaAverageNpatientsOver(c *gin.Context) {

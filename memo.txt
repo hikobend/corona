@@ -1,0 +1,4 @@
+日本の累積の死亡者数 オープンデータ
+累積の死亡者数をJSON形式でご利用いただけます。
+https://opendata.corona.go.jp/api/Covid19JapanNdeaths
+
