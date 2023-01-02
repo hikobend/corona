@@ -64,6 +64,13 @@ func main() {
 	r := gin.Default()
 
 	// ----------------------------------
+	// デフォルトで表示
+	// ----------------------------------
+	r.GET("/count/:date", CountOfPatients)                     // 日の感染者の合計
+	r.GET("/averagenpatients/:date", AverageNpatients)         // 日付を入力して、全国の感染者を上回った都道府県を表示
+	r.GET("/averagenpatientsover/:date", AverageNpatientsOver) // 日付を入力して、全国の感染者を下回った都道府県を表示
+
+	// ----------------------------------
 	// 1
 	// ----------------------------------
 
@@ -118,32 +125,38 @@ func main() {
 
 	r.GET("/getInfection/:date1/:date2", ThirdSecond) // 期間を選択し、感染者を取得 47都道府県
 
+	// -------------
+	// 3 - 3
+	// -------------
+
+	r.GET("/getnpatients/:place/:date1/:date2", ThirdThird) // 期間を選択し、感染者を取得
+
 	// データimport
 	r.POST("/import", Import) // データをimport
 
-	r.GET("/areanpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する
-	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)             // 地方と日付を入力して、感染者の平均を取得する
-	r.GET("/areaaveragenpatientsover/:place/:date", AreaAverageNpatientsOver)     // 地方と日付を入力して、感染者の平均超えている都道府県を取得する
-	r.GET("/leastattachday/:place/:count", LeastAttachDay)                        // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
-	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)         // 年と都道府県を取得して、その年の平均感染者数を取得
-	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)       // 年月と都道府県を取得して、その月の平均感染者数を取得
-	r.GET("/count/:date", CountOfPatients)                                        // 日の感染者の合計
-	r.GET("/diff/:place/:date1/:date2", Diff)                                     // 前日比を表示
-	r.POST("/importdeceased", ImportDeceased)                                     // データをimport
-	r.GET("/get/:date", GetInfectionByDate)                                       // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
-	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)            // 日付と都道府県を選択し、感染者を取得
-	r.GET("/npatients/:place/:date", GetDateNpatients)                            // 日付と地域を選択し、感染者を取得
-	r.GET("/npatientsthreeday/:place/:date", TheDayBeforeRatioPatients)           // 日付と地域を選択し、3日間の感染者を取得
-	r.GET("/npatientsthreedayall/:date", TheDayBeforeRatioPatientsAll)            // 日付を選択し、3日間の感染者を取得 47都道府県
-	r.GET("/getnpatients/:place/:date1/:date2", GetBetWeenDateNpatientsWithPlace) // 期間を選択し、感染者を取得
-	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceAsc)                     // 日付を選択して、感染者が少ない順に表示
-	r.GET("/getnpatientsdesc/:date", GetNpatientsWithPlaceDesc)                   // 日付を選択して、感染者が多い順に表示
-	r.GET("/setnpatientsasc/:date/:count", SetNpatientsAsc)                       // 日付と感染者を入力して、感染者が上回った都道府県を少ない順に表示
-	r.GET("/setnpatientsdesc/:date/:count", SetNpatientsDesc)                     // 日付と感染者を入力して、感染者が上回った都道府県を多い順に表示
-	r.GET("/setnpatientsunderasc/:date/:count", SetNpatientsUnderAsc)             // 日付と感染者を入力して、感染者が下回った都道府県を少ない順に表示
-	r.GET("/setnpatientsunderdesc/:date/:count", SetNpatientsUnderDesc)           // 日付と感染者を入力して、感染者が下回った都道府県を多い順に表示
-	r.GET("/averagenpatients/:date", AverageNpatients)                            // 日付を入力して、全国の感染者を上回った都道府県を表示
-	r.GET("/averagenpatientsover/:date", AverageNpatientsOver)                    // 日付を入力して、全国の感染者を下回った都道府県を表示
+	// ----------------------------------
+	// 不要候補
+	// ----------------------------------
+
+	r.GET("/areanpatients/:place/:date", AreaNpatients)                       // 地方と日付を入力して、感染者を取得する
+	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)         // 地方と日付を入力して、感染者の平均を取得する
+	r.GET("/areaaveragenpatientsover/:place/:date", AreaAverageNpatientsOver) // 地方と日付を入力して、感染者の平均超えている都道府県を取得する
+	r.GET("/leastattachday/:place/:count", LeastAttachDay)                    // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
+	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)     // 年と都道府県を取得して、その年の平均感染者数を取得
+	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)   // 年月と都道府県を取得して、その月の平均感染者数を取得
+	r.GET("/diff/:place/:date1/:date2", Diff)                                 // 前日比を表示
+	r.POST("/importdeceased", ImportDeceased)                                 // データをimport
+	r.GET("/get/:date", GetInfectionByDate)                                   // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
+	r.GET("/npatientsthreedayall/:date", TheDayBeforeRatioPatientsAll)        // 日付を選択し、3日間の感染者を取得 47都道府県
+	r.GET("/getnpatientsasc/:date", GetNpatientsWithPlaceAsc)                 // 日付を選択して、感染者が少ない順に表示
+	r.GET("/getnpatientsdesc/:date", GetNpatientsWithPlaceDesc)               // 日付を選択して、感染者が多い順に表示
+	r.GET("/getplaceanddate/:place/:date", GetInfectionByDateAndPlace)        // 日付と都道府県を選択し、感染者を取得
+	r.GET("/npatients/:place/:date", GetDateNpatients)                        // 日付と地域を選択し、感染者を取得
+	r.GET("/npatientsthreeday/:place/:date", TheDayBeforeRatioPatients)       // 日付と地域を選択し、3日間の感染者を取得
+	r.GET("/setnpatientsasc/:date/:count", SetNpatientsAsc)                   // 日付と感染者を入力して、感染者が上回った都道府県を少ない順に表示
+	r.GET("/setnpatientsdesc/:date/:count", SetNpatientsDesc)                 // 日付と感染者を入力して、感染者が上回った都道府県を多い順に表示
+	r.GET("/setnpatientsunderasc/:date/:count", SetNpatientsUnderAsc)         // 日付と感染者を入力して、感染者が下回った都道府県を少ない順に表示
+	r.GET("/setnpatientsunderdesc/:date/:count", SetNpatientsUnderDesc)       // 日付と感染者を入力して、感染者が下回った都道府県を多い順に表示
 
 	r.Run()
 }
@@ -603,6 +616,39 @@ func ThirdSecond(c *gin.Context) {
 	date2 := c.Param("date2")
 
 	rows, err := db.Query("select date, name_jp, npatients from infection where date between ? and ? order by date ASC", date1, date2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultInfection []infection
+
+	for rows.Next() {
+		infection := infection{}
+		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
+			log.Fatal(err)
+		}
+		resultInfection = append(resultInfection, infection)
+	}
+
+	c.JSON(http.StatusOK, resultInfection)
+
+}
+
+// -------------
+// 3 - 3
+// -------------
+
+func ThirdThird(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	place := c.Param("place")
+	date1 := c.Param("date1")
+	date2 := c.Param("date2")
+
+	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date between ? and ?;", place, date1, date2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1223,35 +1269,6 @@ func GetNpatientsWithPlaceAsc(c *gin.Context) {
 	date := c.Param("date")
 
 	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? order by npatients ASC", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func GetBetWeenDateNpatientsWithPlace(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	place := c.Param("place")
-	date1 := c.Param("date1")
-	date2 := c.Param("date2")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date between ? and ?;", place, date1, date2)
 	if err != nil {
 		log.Fatal(err)
 	}
