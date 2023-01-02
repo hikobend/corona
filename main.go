@@ -49,6 +49,10 @@ type infection struct {
 	Npatients int       `json:"npatients"`
 }
 
+type diff_Npatients struct {
+	Npatients int `json:"npatients"`
+}
+
 // type decease struct {
 // 	Date        time.Time `json:"date"`
 // 	DataName    string    `json:"data_name"`
@@ -75,8 +79,8 @@ func main() {
 	// ----------------------------------
 	// 2-1
 	// ----------------------------------
-	r.GET("/secondfirst/:place/:date", SecondFirst) // ここ7日間の感染者増加を表示 矢印で視覚化
-	r.GET("/diff/:place/:date1/:date2", DiffAdd)    // 前日比を表示
+	r.GET("/secondfirst/:place/:date", SecondFirst) // ここ7日間の感染者推移
+	r.GET("/diffadd/:place/:date", DiffAdd)         // 前日比を表示
 
 	r.GET("/areanpatients/:place/:date", AreaNpatients)                           // 地方と日付を入力して、感染者を取得する
 	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)             // 地方と日付を入力して、感染者の平均を取得する
@@ -223,33 +227,82 @@ func DiffAdd(c *gin.Context) {
 	defer db.Close()
 
 	place := c.Param("place")
-	date1 := c.Param("date1")
-	date2 := c.Param("date2")
-
-	// SELECT文を実行
-	rows, err := db.Query("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date2, place, date1, place)
+	date, err := time.Parse("2006-01-02", c.Param("date"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
 		return
 	}
-	defer rows.Close()
 
-	// 取得した値を表示
-	var diff int
-	for rows.Next() {
-		err := rows.Scan(&diff)
+	prevDate := date.AddDate(0, 0, -1)
+	prev2Date := date.AddDate(0, 0, -2)
+	prev3Date := date.AddDate(0, 0, -3)
+	prev4Date := date.AddDate(0, 0, -4)
+	prev5Date := date.AddDate(0, 0, -5)
+	prev6Date := date.AddDate(0, 0, -6)
+
+	var diff1 diff_Npatients
+	var diff2 diff_Npatients
+	var diff3 diff_Npatients
+	var diff4 diff_Npatients
+	var diff5 diff_Npatients
+	var diff6 diff_Npatients
+
+	// Goroutineを開始
+	var wg sync.WaitGroup
+	wg.Add(6)
+	go func() {
+		// SELECT文を実行
+		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&diff1.Npatients)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+			log.Fatal(err)
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"begin":     date1,
-			"end":       date2,
-			"place":     place,
-			"npatients": diff,
-		})
+		wg.Done()
+	}()
+	go func() {
+		// SELECT文を実行
+		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prevDate, place, prev2Date, place).Scan(&diff2.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		// SELECT文を実行
+		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev2Date, place, prev3Date, place).Scan(&diff3.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		// SELECT文を実行
+		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev3Date, place, prev4Date, place).Scan(&diff4.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		// SELECT文を実行
+		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev4Date, place, prev5Date, place).Scan(&diff5.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		// SELECT文を実行
+		err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev5Date, place, prev6Date, place).Scan(&diff6.Npatients)
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
 
-	}
+	infections := []diff_Npatients{diff1, diff2, diff3, diff4, diff5, diff6}
+
+	c.JSON(http.StatusOK, infections)
 }
 
 func AreaAverageNpatientsOver(c *gin.Context) {
