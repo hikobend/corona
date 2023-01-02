@@ -26,3 +26,21 @@ CREATE TABLE `decease` (
 );
 
 set global max_prepared_stmt_count=50000;
+
+CREATE TABLE `medical` (
+  `id` int AUTO_INCREMENT PRIMARY KEY, 
+	`facility_id`  text,
+	`facility_name` text,
+	`zip_code`      text,
+	`pref_name`     text,
+	`facility_addr` text,
+	`facility_tel`  text,
+	`latitude`     float,
+	`longitude`    float,
+	`submit_date`   date,
+	`facility_type` text,
+	`ans_type`      text,
+	`local_gov_code` int,
+	`city_name`     text,
+	`facility_code` text
+);

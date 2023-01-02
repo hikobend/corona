@@ -16,8 +16,8 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
-type Medical []struct {
-	FacilityID   string `json:"facilityId"`
+type Medical struct {
+	FacilityId   string `json:"facilityId"`
 	FacilityName string `json:"facilityName"`
 	ZipCode      string `json:"zipCode"`
 	PrefName     string `json:"prefName"`
@@ -156,7 +156,8 @@ func main() {
 	r.GET("/getnpatients/:place/:date1/:date2", ThirdThird) // 期間を選択し、感染者を取得
 
 	// データimport
-	r.POST("/import", Import) // 都道府県感染者オープンAPIをimport
+	r.POST("/import", Import)               // 都道府県感染者オープンAPIをimport
+	r.POST("/importmedical", ImportMedical) // 都道府県感染者オープンAPIをimport
 
 	// ----------------------------------
 	// 不要候補
@@ -888,6 +889,59 @@ func Import(c *gin.Context) { // データ取得、データベースに保存
 	log.Print("データ取り込み完了")
 }
 
+func ImportMedical(c *gin.Context) { // データ取得、データベースに保存
+	log.Print("データ取り込み中")
+	// JSONデータを取得する
+	resp, err := http.Get("https://opendata.corona.go.jp/api/covid19DailySurvey")
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	byteArray, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	// JSONデータを解析する
+	var records []Medical
+	if err := json.Unmarshal(byteArray, &records); err != nil {
+		panic(err)
+	}
+
+	// MySQL に接続する
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	delete, err := db.Prepare("DELETE FROM medical")
+	if err != nil {
+		log.Fatal(err)
+	}
+	delete.Exec()
+
+	insert, err := db.Prepare("INSERT INTO medical (facility_id, facility_name, zip_code, pref_name, facility_addr, facility_tel, latitude, longitude, submit_date, facility_type, ans_type, local_gov_code, city_name, facility_code) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer insert.Close()
+
+	for _, f := range records {
+		_, err = insert.Exec(f.FacilityId, f.FacilityName, f.ZipCode, f.PrefName, f.FacilityAddr, f.FacilityTel, f.Latitude, f.Longitude, f.SubmitDate, f.FacilityType, f.AnsType, f.LocalGovCode, f.CityName, f.FacilityCode)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	c.Status(http.StatusOK)
+
+	log.Print("データ取り込み完了")
+}
+
 // ------------------------------------------------------------------------------------------------------------------------------
 
 func AreaAverageNpatientsOver(c *gin.Context) {
@@ -1590,44 +1644,3 @@ func GetDateNpatients(c *gin.Context) {
 	c.JSON(http.StatusOK, infection)
 
 }
-
-// func ImportDeceased(c *gin.Context) { // データ取得、データベースに保存
-// 	log.Print("データ取り込み中")
-// 	url := "https://opendata.corona.go.jp/api/OccurrenceStatusOverseas"
-// 	resp, _ := http.Get(url)
-// 	if resp != nil {
-// 		defer resp.Body.Close()
-// 	}
-// 	byteArray, _ := ioutil.ReadAll(resp.Body)
-
-// 	jsonBytes := ([]byte)(byteArray)
-// 	data := new(Deceased)
-
-// 	if err := json.Unmarshal(jsonBytes, data); err != nil {
-// 		fmt.Println("JSON Unmarshal error:", err)
-// 		return
-// 	}
-// 	// fmt.Println(data.ItemList)
-
-// 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	defer db.Close()
-
-// 	delete, err := db.Prepare("DELETE FROM decease")
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	delete.Exec()
-
-// 	for _, v := range data.ItemList {
-// 		insert, err := db.Prepare("INSERT INTO decease(date, data_name, infected_num, deceased_num) values (?,?,?,?)")
-// 		if err != nil {
-// 			log.Fatal(err)
-// 		}
-// 		insert.Exec(v.Date, v.DataName, v.InfectedNum, v.DeceasedNum)
-// 	}
-
-// 	log.Print("データ取り込み完了")
-// }
