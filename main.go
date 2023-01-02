@@ -53,6 +53,13 @@ type diff_Npatients struct {
 	Npatients int `json:"npatients"`
 }
 
+type diff_Npatients_Place struct {
+	NameJp        string `json:"name_jp"`
+	Npatients     int    `json:"npatients"`
+	NpatientsPrev int    `json:"npatientsprev"`
+	Message       string `json:"message"`
+}
+
 type Event_JSON struct {
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description"`
@@ -138,13 +145,13 @@ func main() {
 	// 不要候補
 	// ----------------------------------
 
+	r.GET("/diff/:place/:date1/:date2", Diff)                                 // 前日比を表示
 	r.GET("/areanpatients/:place/:date", AreaNpatients)                       // 地方と日付を入力して、感染者を取得する
 	r.GET("/areaaveragenpatients/:place/:date", AreaAverageNpatients)         // 地方と日付を入力して、感染者の平均を取得する
 	r.GET("/areaaveragenpatientsover/:place/:date", AreaAverageNpatientsOver) // 地方と日付を入力して、感染者の平均超えている都道府県を取得する
 	r.GET("/leastattachday/:place/:count", LeastAttachDay)                    // 都道府県と日付を入力して、既定の感染者に到達した最短の日程を表示
 	r.GET("/averagenpatientsinyear/:place/:date", AverageNpatientsInYear)     // 年と都道府県を取得して、その年の平均感染者数を取得
 	r.GET("/averagenpatientsinmonth/:place/:date", AverageNpatientsInMonth)   // 年月と都道府県を取得して、その月の平均感染者数を取得
-	r.GET("/diff/:place/:date1/:date2", Diff)                                 // 前日比を表示
 	r.POST("/importdeceased", ImportDeceased)                                 // データをimport
 	r.GET("/get/:date", GetInfectionByDate)                                   // 日付を選択し、感染者を取得 47都道府県　-> 47都道府県を並列処理で対処できないか
 	r.GET("/npatientsthreedayall/:date", TheDayBeforeRatioPatientsAll)        // 日付を選択し、3日間の感染者を取得 47都道府県
@@ -167,6 +174,74 @@ func main() {
 
 func FirstFirst(c *gin.Context) {
 
+	// Open database connection
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer db.Close()
+
+	// Parse date from request parameter
+	date, err := time.Parse("2006-01-02", c.Param("date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	// Calculate previous dates
+	prevDate := date.AddDate(0, 0, -1)
+	prev2Date := date.AddDate(0, 0, -2)
+
+	// Initialize slice to store results
+	infections := []diff_Npatients_Place{}
+	// Create a WaitGroup to wait for all goroutines to finish
+	var wg sync.WaitGroup
+
+	// Iterate through places and retrieve data
+	places := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
+	for _, place := range places {
+		// Launch a goroutine to retrieve data for current and previous dates
+		wg.Add(1)
+		go func(place string) {
+			defer wg.Done() // Decrement the WaitGroup counter when the goroutine finishes
+
+			// Initialize struct to store results
+			npatients := diff_Npatients_Place{NameJp: place}
+
+			// Retrieve data for current and previous dates
+			err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&npatients.Npatients)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prevDate, place, prev2Date, place).Scan(&npatients.NpatientsPrev)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			if npatients.Npatients/npatients.NpatientsPrev*100 > 140 {
+				npatients.Message = "Too Danger"
+			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 120 {
+				npatients.Message = "Danger"
+			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 100 {
+				npatients.Message = "Warning"
+			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 80 {
+				npatients.Message = "Caution"
+			} else {
+				npatients.Message = "attention"
+			}
+			// Append results to slice
+			infections = append(infections, npatients)
+		}(place)
+	}
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+
+	// Return results
+	c.JSON(http.StatusOK, infections)
 }
 
 // -------------
