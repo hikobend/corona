@@ -90,7 +90,8 @@ type Medicals struct {
 }
 
 func main() {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(loggingMiddleware())
 	// ----------------------------------
 	// デフォルトで表示
 	// ----------------------------------
@@ -132,6 +133,22 @@ func main() {
 	r.POST("/importmedical", ImportMedical) // 都道府県感染者オープンAPIをimport
 
 	r.Run()
+}
+
+func loggingMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// ミドルウェアの前処理
+		startTime := time.Now()
+
+		// ミドルウェア内でリクエストの処理を実行
+		c.Next()
+
+		// ミドルウェアの後処理
+		latency := time.Since(startTime)
+		fmt.Println(c.Request.Method, c.Request.URL.Path, c.Writer.Status())
+		time := fmt.Sprintf("%dms", latency/time.Millisecond)
+		log.Print(time)
+	}
 }
 
 func CountOfPatients(c *gin.Context) {
