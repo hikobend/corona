@@ -128,12 +128,13 @@ func main() {
 	// ----------------------------------
 	// 4
 	// ----------------------------------
-	r.GET("/medicals/:place", ForthFirst)         // 都道府県のマップを表示
-	r.GET("/medical/:hospital_name", ForthSecond) // 都道府県のマップを表示
+	r.GET("/medicals/:place", ForthFirst)         //
+	r.GET("/medical/:hospital_name", ForthSecond) //
 
 	// ----------------------------------
 	// 5
 	// ----------------------------------
+	r.GET("/hospital/:place/:status", FifthFirst) //
 	// ----------------------------------
 	// データをimport
 	// ----------------------------------
@@ -891,6 +892,33 @@ func ForthSecond(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, medical)
+}
+
+func FifthFirst(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	place := c.Param("place")
+	status := c.Param("status")
+
+	rows, err := db.Query("select facility_name, zip_code, facility_addr, facility_tel, submit_date, facility_type, city_name from medical where facility_addr like ? and facility_type = ?", place+"%", status)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultMedical []Medicals_show
+
+	for rows.Next() {
+		medical := Medicals_show{}
+		if err := rows.Scan(&medical.FacilityName, &medical.ZipCode, &medical.FacilityAddr, &medical.FacilityTel, &medical.SubmitDate, &medical.FacilityType, &medical.CityName); err != nil {
+			log.Fatal(err)
+		}
+		resultMedical = append(resultMedical, medical)
+	}
+
+	c.JSON(http.StatusOK, resultMedical)
 }
 
 func Validate() *validator.Validate {
