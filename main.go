@@ -87,12 +87,11 @@ type Medicals struct {
 type Medicals_show struct {
 	FacilityName string `json:"facilityName"` // 病院名
 	ZipCode      string `json:"zipCode"`      // 郵便番号
-	PrefName     string `json:"prefName"`     // 都道府県
+	CityName     string `json:"cityName"`     // 市町村
 	FacilityAddr string `json:"facilityAddr"` // 場所
 	FacilityTel  string `json:"facilityTel"`  // 電話番号
 	SubmitDate   string `json:"submitDate"`   // 日付
 	FacilityType string `json:"facilityType"` // 状況
-	CityName     string `json:"cityName"`     // 市町村
 }
 
 func main() {
@@ -129,7 +128,8 @@ func main() {
 	// ----------------------------------
 	// 4
 	// ----------------------------------
-	r.GET("/medical/:place", ForthFirst) // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
+	r.GET("/medicals/:place", ForthFirst)         // 都道府県のマップを表示
+	r.GET("/medical/:hospital_name", ForthSecond) // 都道府県のマップを表示
 
 	// ----------------------------------
 	// 5
@@ -872,6 +872,25 @@ func ForthFirst(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resultMedical)
+}
+
+func ForthSecond(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	hospital_name := c.Param("hospital_name")
+
+	var medical Medicals_show
+
+	err = db.QueryRow("select facility_name, zip_code, facility_addr, facility_tel, submit_date, facility_type, city_name from medical where facility_name = ?", hospital_name).Scan(&medical.FacilityName, &medical.ZipCode, &medical.FacilityAddr, &medical.FacilityTel, &medical.SubmitDate, &medical.FacilityType, &medical.CityName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	c.JSON(http.StatusOK, medical)
 }
 
 func Validate() *validator.Validate {
