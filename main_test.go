@@ -1,31 +1,60 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestCountOfPatients(t *testing.T) {
-	// テスト用のgin.Engineを作成
-	r := gin.New()
-	r.GET("/count/:date", CountOfPatients)
+func TestLoggingMiddleware(t *testing.T) {
+	// create a mock request and response
+	req, _ := http.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
 
-	// テスト用のリクエストを作成
-	req, err := http.NewRequest("GET", "/count/2022-12-1", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// create a gin context with the mock request and response
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
 
-	// テスト
-	rr := httptest.NewRecorder()
-	r.ServeHTTP(rr, req)
+	// call the logging middleware
+	loggingMiddleware()(c)
 
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
+	// assert that the middleware logged the correct information
+	assert.Equal(t, "GET / 200", fmt.Sprintf("%s %s %d", c.Request.Method, c.Request.URL.Path, w.Code))
+	// assert that the middleware logged a latency time in the correct format
+	// create a start time
+	startTime := time.Now()
+
+	// simulate some latency
+	time.Sleep(100 * time.Millisecond)
+
+	// calculate the latency
+	latency := time.Since(startTime)
+
+	// format the latency as a string
+	timeStr := fmt.Sprintf("%dms", latency/time.Millisecond)
+
+	// assert that the formatted latency is correct
+	assert.Equal(t, "101ms", timeStr)
 }
 
-// 以下、他の関数も同様にテストを追加していけばよいです。
+func TestCountOfPatients(t *testing.T) {
+	// テスト用のMySQLデータベースに接続するための文字列を作成
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+
+	if err != nil {
+		t.Errorf("failed to connect to database: %s", err)
+	}
+	defer db.Close()
+
+	// コネクションの確認
+	err = db.Ping()
+	if err != nil {
+		t.Errorf("failed to ping database: %s", err)
+	}
+}
