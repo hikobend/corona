@@ -94,6 +94,12 @@ type Medicals_show struct {
 	FacilityType string `json:"facilityType"` // 状況
 }
 
+type Medical_count struct {
+	Place         string `json:"place"`
+	HospitalCount int    `json:"hospital_count"`
+	Npatients     int    `json:"npatients"`
+}
+
 func main() {
 	r := gin.New()
 	r.Use(loggingMiddleware())
@@ -135,6 +141,7 @@ func main() {
 	// 5
 	// ----------------------------------
 	r.GET("/hospital/:place/:status", FifthFirst) //
+	r.GET("/safearea/:date", FifthSecond)         //
 	// ----------------------------------
 	// データをimport
 	// ----------------------------------
@@ -399,13 +406,7 @@ func SecondFirst(c *gin.Context) {
 
 	place := c.Param("place")
 
-	var infection1 infection
-	var infection2 infection
-	var infection3 infection
-	var infection4 infection
-	var infection5 infection
-	var infection6 infection
-	var infection7 infection
+	var infection1, infection2, infection3, infection4, infection5, infection6, infection7 infection
 	var wg sync.WaitGroup
 	go func() {
 		defer wg.Done()
@@ -493,12 +494,7 @@ func DiffAdd(c *gin.Context) {
 	prev5Date := date.AddDate(0, 0, -5)
 	prev6Date := date.AddDate(0, 0, -6)
 
-	var diff1 diff_Npatients
-	var diff2 diff_Npatients
-	var diff3 diff_Npatients
-	var diff4 diff_Npatients
-	var diff5 diff_Npatients
-	var diff6 diff_Npatients
+	var diff1, diff2, diff3, diff4, diff5, diff6 diff_Npatients
 
 	var wg sync.WaitGroup
 	wg.Add(6)
@@ -919,6 +915,47 @@ func FifthFirst(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resultMedical)
+}
+
+func FifthSecond(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	date, err := time.Parse("2006-01-02", c.Param("date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	prefNames := []string{"北海道", "青森県"}
+	resultChan := make(chan Medical_count, len(prefNames))
+
+	for _, prefName := range prefNames {
+		go func(prefName string) {
+			var count, npatients int
+			err = db.QueryRow("select count(*) from medical where pref_name = ?", prefName).Scan(&count)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			err = db.QueryRow("select npatients from infection where name_jp = ? and date = ?", prefName, date).Scan(&npatients)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			resultChan <- Medical_count{Place: prefName, HospitalCount: count, Npatients: npatients}
+		}(prefName)
+	}
+
+	result := make([]Medical_count, 0)
+	for i := 0; i < len(prefNames); i++ {
+		result = append(result, <-resultChan)
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 func Validate() *validator.Validate {
