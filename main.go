@@ -98,6 +98,8 @@ type Medical_count struct {
 	Place         string `json:"place"`
 	HospitalCount int    `json:"hospital_count"`
 	Npatients     int    `json:"npatients"`
+	Per           string `json:"per"`
+	Message       string `json:"message"`
 }
 
 func main() {
@@ -930,7 +932,7 @@ func FifthSecond(c *gin.Context) {
 		return
 	}
 
-	prefNames := []string{"北海道", "青森県"}
+	prefNames := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
 	resultChan := make(chan Medical_count, len(prefNames))
 
 	for _, prefName := range prefNames {
@@ -946,7 +948,24 @@ func FifthSecond(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-			resultChan <- Medical_count{Place: prefName, HospitalCount: count, Npatients: npatients}
+			// 病床使用率を57%として計算 https://stopcovid19.metro.tokyo.lg.jp/
+			per := npatients / count * 57 / 100
+			p := strconv.Itoa(int(per))
+			var message string
+			if per > 1000 {
+				message = "Too Danger Area"
+			} else if per > 700 {
+				message = "Danger Area"
+			} else if per > 400 {
+				message = "Warning Area"
+			} else if per > 100 {
+				message = "Caution Area"
+			} else {
+				message = "attention Area"
+			}
+			resultChan <- Medical_count{Place: prefName, HospitalCount: count, Npatients: npatients, Per: p, Message: message}
+
+			// }
 		}(prefName)
 	}
 
