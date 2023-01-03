@@ -80,6 +80,12 @@ type Event_JSON struct {
 
 type Medicals struct {
 	FacilityName string `json:"facilityName"` // 病院名
+	FacilityAddr string `json:"facilityAddr"` // 場所
+	FacilityType string `json:"facilityType"` // 状況
+}
+
+type Medicals_show struct {
+	FacilityName string `json:"facilityName"` // 病院名
 	ZipCode      string `json:"zipCode"`      // 郵便番号
 	PrefName     string `json:"prefName"`     // 都道府県
 	FacilityAddr string `json:"facilityAddr"` // 場所
@@ -123,6 +129,8 @@ func main() {
 	// ----------------------------------
 	// 4
 	// ----------------------------------
+	r.GET("/medical/:place", ForthFirst) // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
+
 	// ----------------------------------
 	// 5
 	// ----------------------------------
@@ -838,6 +846,32 @@ func ThirdThird(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resultInfection)
 
+}
+
+func ForthFirst(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	place := c.Param("place")
+
+	rows, err := db.Query("select facility_name, facility_addr, facility_type from medical where pref_name = ?", place)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var resultMedical []Medicals
+
+	for rows.Next() {
+		medical := Medicals{}
+		if err := rows.Scan(&medical.FacilityName, &medical.FacilityAddr, &medical.FacilityType); err != nil {
+			log.Fatal(err)
+		}
+		resultMedical = append(resultMedical, medical)
+	}
+
+	c.JSON(http.StatusOK, resultMedical)
 }
 
 func Validate() *validator.Validate {
