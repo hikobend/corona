@@ -1,0 +1,1176 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>corona: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/hikobend/corona/main.go (7.1%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "database/sql"
+        "encoding/json"
+        "fmt"
+        "io/ioutil"
+        "log"
+        "net/http"
+        "strconv"
+        "sync"
+        "time"
+
+        "github.com/gin-gonic/gin"
+        _ "github.com/go-sql-driver/mysql"
+        "gopkg.in/go-playground/validator.v9"
+)
+
+type Npatients struct {
+        ErrorInfo struct {
+                ErrorFlag    string `json:"errorFlag"`
+                ErrorCode    string `json:"errorCode"`
+                ErrorMessage string `json:"errorMessage"`
+        } `json:"errorInfo"`
+        ItemList []struct {
+                Date      string `json:"date"`
+                NameJp    string `json:"name_jp"`
+                Npatients string `json:"npatients"`
+        } `json:"itemList"`
+}
+
+type Medical struct {
+        FacilityId   string `json:"facilityId"`
+        FacilityName string `json:"facilityName"`
+        ZipCode      string `json:"zipCode"`
+        PrefName     string `json:"prefName"`
+        FacilityAddr string `json:"facilityAddr"`
+        FacilityTel  string `json:"facilityTel"`
+        Latitude     string `json:"latitude"`
+        Longitude    string `json:"longitude"`
+        SubmitDate   string `json:"submitDate"`
+        FacilityType string `json:"facilityType"`
+        AnsType      string `json:"ansType"`
+        LocalGovCode string `json:"localGovCode"`
+        CityName     string `json:"cityName"`
+        FacilityCode string `json:"facilityCode"`
+}
+
+type infection struct {
+        Date      time.Time `json:"date"`
+        NameJp    string    `json:"name_jp"`
+        Npatients int       `json:"npatients"`
+}
+
+type diff_Npatients struct {
+        Npatients int `json:"npatients"`
+}
+
+type diff_Npatients_Place struct {
+        NameJp        string `json:"name_jp"`
+        Npatients     int    `json:"npatients"`
+        NpatientsPrev int    `json:"npatientsprev"`
+        Message       string `json:"message"`
+}
+
+type diff_Npatients_Place_Per struct {
+        NameJp        string  `json:"name_jp"`
+        Npatients     float64 `json:"npatients"`
+        NpatientsPrev float64 `json:"npatientsprev"`
+        Per           string  `json:"per"`
+        Message       string  `json:"message"`
+}
+
+type Event_JSON struct {
+        Title       string `json:"title" validate:"required"`
+        Description string `json:"description"`
+        Begin       string `json:"begin" validate:"required"`
+        End         string `json:"end" validate:"required"`
+}
+
+type Medicals struct {
+        FacilityName string `json:"facilityName"` // 病院名
+        FacilityAddr string `json:"facilityAddr"` // 場所
+        FacilityType string `json:"facilityType"` // 状況
+}
+
+type Medicals_show struct {
+        FacilityName string `json:"facilityName"` // 病院名
+        ZipCode      string `json:"zipCode"`      // 郵便番号
+        CityName     string `json:"cityName"`     // 市町村
+        FacilityAddr string `json:"facilityAddr"` // 場所
+        FacilityTel  string `json:"facilityTel"`  // 電話番号
+        SubmitDate   string `json:"submitDate"`   // 日付
+        FacilityType string `json:"facilityType"` // 状況
+}
+
+type Medical_count struct {
+        Place         string `json:"place"`
+        HospitalCount int    `json:"hospital_count"`
+        Npatients     int    `json:"npatients"`
+        Per           string `json:"per"`
+        Message       string `json:"message"`
+}
+
+func main() <span class="cov8" title="1">{
+        r := gin.New()
+        r.Use(loggingMiddleware())
+        // ----------------------------------
+        // デフォルトで表示
+        // ----------------------------------
+        r.GET("/count/:date", CountOfPatients)                     // 日の感染者の合計
+        r.GET("/averagenpatients/:date", AverageNpatients)         // 日付を入力して、全国の感染者を上回った都道府県を表示
+        r.GET("/averagenpatientsover/:date", AverageNpatientsOver) // 日付を入力して、全国の感染者を下回った都道府県を表示
+        // ----------------------------------
+        // 1
+        // ----------------------------------
+        r.GET("/firstfirst/:date", FirstFirst)   // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
+        r.GET("/firstsecond/:date", FirstSecond) // 都道府県のマップを表示 色で危険地帯を視覚で把握可能 前々日比と前日比を算出して、前日比の方が多い場合、警告文字を変更する。その文字によって色を変える
+        // ----------------------------------
+        // 2
+        // ----------------------------------
+        r.GET("/secondfirst/:place/:date", SecondFirst)       // ここ7日間の感染者推移
+        r.GET("/diffadd/:place/:date", DiffAdd)               // 前日比を表示
+        r.GET("/npatientsinmonth/:place/:date", SecondSecond) // 年月と都道府県を取得して、その月の感染者数推移を取得
+        r.GET("/npatientsinyear/:place/:date", SecondThird)   // 年と都道府県を取得して、その年の感染者推移を取得
+        // ----------------------------------
+        // 3
+        // ----------------------------------
+        r.POST("/create", Create)                               // コロナに関するメモを追加
+        r.GET("/show/:id", Show)                                // コロナに関するメモを表示
+        r.GET("/shows", ShowAll)                                // コロナに関するメモを表示
+        r.PATCH("/show/:id", Update)                            // コロナに関するメモを変更
+        r.DELETE("/delete/:id", Delete)                         // コロナに関するメモを削除
+        r.GET("/getInfection/:date1/:date2", ThirdSecond)       // 期間を選択し、感染者を取得 47都道府県
+        r.GET("/getnpatients/:place/:date1/:date2", ThirdThird) // 期間を選択し、感染者を取得
+        // ----------------------------------
+        // 4
+        // ----------------------------------
+        r.GET("/medicals/:place", ForthFirst)         //
+        r.GET("/medical/:hospital_name", ForthSecond) //
+
+        // ----------------------------------
+        // 5
+        // ----------------------------------
+        r.GET("/hospital/:place/:status", FifthFirst) //
+        r.GET("/safearea/:date", FifthSecond)         //
+        // ----------------------------------
+        // データをimport
+        // ----------------------------------
+        r.POST("/import", Import)               // 都道府県感染者オープンAPIをimport
+        r.POST("/importmedical", ImportMedical) // 都道府県感染者オープンAPIをimport
+
+        r.Run()
+}</span>
+
+func loggingMiddleware() gin.HandlerFunc <span class="cov8" title="1">{
+        return func(c *gin.Context) </span><span class="cov8" title="1">{
+                startTime := time.Now()
+                c.Next()
+                latency := time.Since(startTime)
+                fmt.Println(c.Request.Method, c.Request.URL.Path, c.Writer.Status())
+                time := fmt.Sprintf("%dms", latency/time.Millisecond)
+                log.Print(time)
+        }</span>
+}
+
+func CountOfPatients(c *gin.Context) <span class="cov8" title="1">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov8" title="1">defer db.Close()
+
+        date, err := time.Parse("2006-01-02", c.Param("date"))
+        if err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+                return
+        }</span>
+
+        <span class="cov0" title="0">var sum int
+        err = db.QueryRow("select sum(npatients) from infection where date = ?", date).Scan(&amp;sum)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        // 結果をJSONで出力
+        <span class="cov0" title="0">c.JSON(http.StatusOK, gin.H{
+                "date":      date,
+                "npatients": sum,
+        })</span>
+}
+
+func AverageNpatients(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date := c.Param("date")
+
+        rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients &gt; (select avg(npatients) from infection)", date)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer rows.Close()
+
+        var resultInfection []infection
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                infection := infection{}
+                if err := rows.Scan(&amp;infection.Date, &amp;infection.NameJp, &amp;infection.Npatients); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultInfection = append(resultInfection, infection)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultInfection)</span>
+
+}
+
+func AverageNpatientsOver(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date := c.Param("date")
+
+        rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients &lt; (select avg(npatients) from infection)", date)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer rows.Close()
+
+        var resultInfection []infection
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                infection := infection{}
+                if err := rows.Scan(&amp;infection.Date, &amp;infection.NameJp, &amp;infection.Npatients); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultInfection = append(resultInfection, infection)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultInfection)</span>
+
+}
+
+// -------------
+// 1 - 1
+// -------------
+
+func FirstFirst(c *gin.Context) <span class="cov0" title="0">{
+
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date, err := time.Parse("2006-01-02", c.Param("date"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">prevDate := date.AddDate(0, 0, -1)
+        prev2Date := date.AddDate(0, 0, -2)
+
+        infections := []diff_Npatients_Place{}
+        var wg sync.WaitGroup
+
+        places := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
+        for _, place := range places </span><span class="cov0" title="0">{
+                wg.Add(1)
+                go func(place string) </span><span class="cov0" title="0">{
+                        defer wg.Done()
+
+                        npatients := diff_Npatients_Place{NameJp: place}
+
+                        err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&amp;npatients.Npatients)
+                        if err != nil </span><span class="cov0" title="0">{
+                                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                                return
+                        }</span>
+                        <span class="cov0" title="0">err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prevDate, place, prev2Date, place).Scan(&amp;npatients.NpatientsPrev)
+                        if err != nil </span><span class="cov0" title="0">{
+                                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                                return
+                        }</span>
+
+                        <span class="cov0" title="0">if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 140 </span><span class="cov0" title="0">{
+                                npatients.Message = "Too Danger"
+                        }</span> else<span class="cov0" title="0"> if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 120 </span><span class="cov0" title="0">{
+                                npatients.Message = "Danger"
+                        }</span> else<span class="cov0" title="0"> if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 100 </span><span class="cov0" title="0">{
+                                npatients.Message = "Warning"
+                        }</span> else<span class="cov0" title="0"> if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 80 </span><span class="cov0" title="0">{
+                                npatients.Message = "Caution"
+                        }</span> else<span class="cov0" title="0"> {
+                                npatients.Message = "attention"
+                        }</span>
+                        <span class="cov0" title="0">infections = append(infections, npatients)</span>
+                }(place)
+        }
+        <span class="cov0" title="0">wg.Wait()
+
+        c.JSON(http.StatusOK, infections)</span>
+}
+
+// -------------
+// 1 - 2
+// -------------
+
+func FirstSecond(c *gin.Context) <span class="cov0" title="0">{
+
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date, err := time.Parse("2006-01-02", c.Param("date"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">prevDate := date.AddDate(0, 0, -1)
+        prev2Date := date.AddDate(0, 0, -2)
+
+        infections := []diff_Npatients_Place_Per{}
+        var wg sync.WaitGroup
+
+        places := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
+        for _, place := range places </span><span class="cov0" title="0">{
+                wg.Add(1)
+                go func(place string) </span><span class="cov0" title="0">{
+                        defer wg.Done()
+
+                        npatients := diff_Npatients_Place_Per{NameJp: place}
+
+                        err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&amp;npatients.Npatients)
+                        if err != nil </span><span class="cov0" title="0">{
+                                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                                return
+                        }</span>
+                        <span class="cov0" title="0">err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prevDate, place, prev2Date, place).Scan(&amp;npatients.NpatientsPrev)
+                        if err != nil </span><span class="cov0" title="0">{
+                                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                                return
+                        }</span>
+
+                        <span class="cov0" title="0">per := npatients.Npatients / npatients.NpatientsPrev * 100
+                        s := strconv.Itoa(int(per))
+                        npatients.Per = s + "%"
+
+                        if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 140 </span><span class="cov0" title="0">{
+                                npatients.Message = "Too Danger"
+                        }</span> else<span class="cov0" title="0"> if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 120 </span><span class="cov0" title="0">{
+                                npatients.Message = "Danger"
+                        }</span> else<span class="cov0" title="0"> if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 100 </span><span class="cov0" title="0">{
+                                npatients.Message = "Warning"
+                        }</span> else<span class="cov0" title="0"> if npatients.Npatients/npatients.NpatientsPrev*100 &gt; 80 </span><span class="cov0" title="0">{
+                                npatients.Message = "Caution"
+                        }</span> else<span class="cov0" title="0"> {
+                                npatients.Message = "attention"
+                        }</span>
+                        <span class="cov0" title="0">infections = append(infections, npatients)</span>
+                }(place)
+        }
+
+        <span class="cov0" title="0">wg.Wait()
+
+        c.JSON(http.StatusOK, infections)</span>
+}
+
+// -------------
+// 2 - 1
+// -------------
+
+func SecondFirst(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date, err := time.Parse("2006-01-02", c.Param("date"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+                return
+        }</span>
+        <span class="cov0" title="0">prevDate := date.AddDate(0, 0, -1)
+        prev2Date := date.AddDate(0, 0, -2)
+        prev3Date := date.AddDate(0, 0, -3)
+        prev4Date := date.AddDate(0, 0, -4)
+        prev5Date := date.AddDate(0, 0, -5)
+        prev6Date := date.AddDate(0, 0, -6)
+
+        place := c.Param("place")
+
+        var infection1, infection2, infection3, infection4, infection5, infection6, infection7 infection
+        var wg sync.WaitGroup
+        go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, date).Scan(&amp;infection1.Date, &amp;infection1.NameJp, &amp;infection1.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prevDate).Scan(&amp;infection2.Date, &amp;infection2.NameJp, &amp;infection2.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev2Date).Scan(&amp;infection3.Date, &amp;infection3.NameJp, &amp;infection3.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev3Date).Scan(&amp;infection4.Date, &amp;infection4.NameJp, &amp;infection4.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev4Date).Scan(&amp;infection5.Date, &amp;infection5.NameJp, &amp;infection5.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev5Date).Scan(&amp;infection6.Date, &amp;infection6.NameJp, &amp;infection6.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev6Date).Scan(&amp;infection7.Date, &amp;infection7.NameJp, &amp;infection7.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+        }()
+        <span class="cov0" title="0">wg.Add(7)
+        wg.Wait()
+
+        infections := []infection{infection1, infection2, infection3, infection4, infection5, infection6, infection7}
+
+        c.JSON(http.StatusOK, infections)</span>
+}
+
+func DiffAdd(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        place := c.Param("place")
+        date, err := time.Parse("2006-01-02", c.Param("date"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+                return
+        }</span>
+
+        <span class="cov0" title="0">prevDate := date.AddDate(0, 0, -1)
+        prev2Date := date.AddDate(0, 0, -2)
+        prev3Date := date.AddDate(0, 0, -3)
+        prev4Date := date.AddDate(0, 0, -4)
+        prev5Date := date.AddDate(0, 0, -5)
+        prev6Date := date.AddDate(0, 0, -6)
+
+        var diff1, diff2, diff3, diff4, diff5, diff6 diff_Npatients
+
+        var wg sync.WaitGroup
+        wg.Add(6)
+        go func() </span><span class="cov0" title="0">{
+                err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", date, place, prevDate, place).Scan(&amp;diff1.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">wg.Done()</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prevDate, place, prev2Date, place).Scan(&amp;diff2.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">wg.Done()</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev2Date, place, prev3Date, place).Scan(&amp;diff3.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">wg.Done()</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev3Date, place, prev4Date, place).Scan(&amp;diff4.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">wg.Done()</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev4Date, place, prev5Date, place).Scan(&amp;diff5.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">wg.Done()</span>
+        }()
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                err = db.QueryRow("SELECT (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) - (SELECT npatients FROM infection WHERE date = ? AND name_jp = ?) as npatients", prev5Date, place, prev6Date, place).Scan(&amp;diff6.Npatients)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">wg.Done()</span>
+        }()
+        <span class="cov0" title="0">wg.Wait()
+
+        infections := []diff_Npatients{diff1, diff2, diff3, diff4, diff5, diff6}
+
+        c.JSON(http.StatusOK, infections)</span>
+}
+
+// -------------
+// 2 - 2
+// -------------
+
+func SecondSecond(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date := c.Param("date")
+        place := c.Param("place")
+
+        rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ? ORDER BY date ASC", place, date+"%")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">var resultInfection []infection
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                infection := infection{}
+                if err := rows.Scan(&amp;infection.Date, &amp;infection.NameJp, &amp;infection.Npatients); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultInfection = append(resultInfection, infection)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultInfection)</span>
+
+}
+
+// -------------
+// 2 - 3
+// -------------
+
+func SecondThird(c *gin.Context) <span class="cov0" title="0">{
+        // Connect to the database
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date := c.Param("date")
+        place := c.Param("place")
+
+        rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date like ? order by date ASC", place, date+"%")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+
+        <span class="cov0" title="0">var resultInfection []infection
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                infection := infection{}
+                if err := rows.Scan(&amp;infection.Date, &amp;infection.NameJp, &amp;infection.Npatients); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultInfection = append(resultInfection, infection)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultInfection)</span>
+}
+
+// -------------
+// 3 - 1
+// -------------
+
+func Create(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        var json Event_JSON
+        validate := Validate() //インスタンス生成
+
+        if err := c.ShouldBindJSON(&amp;json); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        // yyyymmdd形式の文字列をtime.Time型に変換
+        <span class="cov0" title="0">layout := "20060102"
+        t, err := time.Parse(layout, json.Begin)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        // yyyymmdd形式の文字列をtime.Time型に変換
+        <span class="cov0" title="0">t2, err := time.Parse(layout, json.End)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov0" title="0">if err = validate.Struct(&amp;json); err != nil </span><span class="cov0" title="0">{ //バリデーションを実行し、NGの場合、ここでエラーが返る。
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        }</span>
+
+        <span class="cov0" title="0">insert, err := db.Prepare("INSERT INTO events (title, description, begin, end) VALUES (?, ?, ?, ?)")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov0" title="0">defer insert.Close()
+
+        // パラメータを設定してクエリを実行
+        _, err = insert.Exec(json.Title, json.Description, t.Format("2006-01-02"), t2.Format("2006-01-02"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        }</span>
+}
+
+func Show(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        id, err := strconv.Atoi(c.Param("id"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+                return
+        }</span>
+
+        <span class="cov0" title="0">var json Event_JSON
+        err = db.QueryRow("SELECT title, description, begin, end FROM events WHERE id = ?", id).Scan(&amp;json.Title, &amp;json.Description, &amp;json.Begin, &amp;json.End)
+        if err != nil </span><span class="cov0" title="0">{
+                if err == sql.ErrNoRows </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusNotFound, gin.H{"error": "event not found"}) // 404
+                        return
+                }</span>
+                <span class="cov0" title="0">c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, json)</span>
+}
+
+func ShowAll(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        rows, err := db.Query("SELECT title, description, begin, end FROM events")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+        <span class="cov0" title="0">defer rows.Close()
+
+        var result []Event_JSON
+        for rows.Next() </span><span class="cov0" title="0">{
+                var json Event_JSON
+                if err := rows.Scan(&amp;json.Title, &amp;json.Description, &amp;json.Begin, &amp;json.End); err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                        return
+                }</span>
+                <span class="cov0" title="0">result = append(result, json)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, result)</span> // 200
+}
+
+func Update(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        var json Event_JSON
+        if err := c.ShouldBindJSON(&amp;json); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"}) // 400
+                return
+        }</span>
+
+        <span class="cov0" title="0">id, err := strconv.Atoi(c.Param("id"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+                return
+        }</span>
+
+        <span class="cov0" title="0">update, err := db.Prepare("UPDATE events SET title = ?, description = ?, begin = ?, end = ? WHERE id = ?")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+        <span class="cov0" title="0">if _, err := update.Exec(json.Title, json.Description, json.Begin, json.End, id); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+
+        <span class="cov0" title="0">c.Status(http.StatusOK)</span> // 200
+}
+
+func Delete(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        id, err := strconv.Atoi(c.Param("id"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+                return
+        }</span>
+
+        <span class="cov0" title="0">delete, err := db.Prepare("DELETE FROM events WHERE id = ?")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+        <span class="cov0" title="0">if _, err := delete.Exec(id); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+                return
+        }</span>
+
+        <span class="cov0" title="0">c.Status(http.StatusOK)</span> // 200
+}
+
+// -------------
+// 3 - 2
+// -------------
+
+func ThirdSecond(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date1 := c.Param("date1")
+        date2 := c.Param("date2")
+
+        rows, err := db.Query("select date, name_jp, npatients from infection where date between ? and ? order by date ASC", date1, date2)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">var resultInfection []infection
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                infection := infection{}
+                if err := rows.Scan(&amp;infection.Date, &amp;infection.NameJp, &amp;infection.Npatients); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultInfection = append(resultInfection, infection)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultInfection)</span>
+
+}
+
+// -------------
+// 3 - 3
+// -------------
+
+func ThirdThird(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        place := c.Param("place")
+        date1 := c.Param("date1")
+        date2 := c.Param("date2")
+
+        rows, err := db.Query("select date, name_jp, npatients from infection where name_jp = ? and date between ? and ?;", place, date1, date2)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">var resultInfection []infection
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                infection := infection{}
+                if err := rows.Scan(&amp;infection.Date, &amp;infection.NameJp, &amp;infection.Npatients); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultInfection = append(resultInfection, infection)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultInfection)</span>
+
+}
+
+func ForthFirst(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        place := c.Param("place")
+
+        rows, err := db.Query("select facility_name, facility_addr, facility_type from medical where pref_name = ?", place)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">var resultMedical []Medicals
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                medical := Medicals{}
+                if err := rows.Scan(&amp;medical.FacilityName, &amp;medical.FacilityAddr, &amp;medical.FacilityType); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultMedical = append(resultMedical, medical)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultMedical)</span>
+}
+
+func ForthSecond(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        hospital_name := c.Param("hospital_name")
+
+        var medical Medicals_show
+
+        err = db.QueryRow("select facility_name, zip_code, facility_addr, facility_tel, submit_date, facility_type, city_name from medical where facility_name = ?", hospital_name).Scan(&amp;medical.FacilityName, &amp;medical.ZipCode, &amp;medical.FacilityAddr, &amp;medical.FacilityTel, &amp;medical.SubmitDate, &amp;medical.FacilityType, &amp;medical.CityName)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, medical)</span>
+}
+
+func FifthFirst(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        place := c.Param("place")
+        status := c.Param("status")
+
+        rows, err := db.Query("select facility_name, zip_code, facility_addr, facility_tel, submit_date, facility_type, city_name from medical where facility_addr like ? and facility_type = ?", place+"%", status)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">var resultMedical []Medicals_show
+
+        for rows.Next() </span><span class="cov0" title="0">{
+                medical := Medicals_show{}
+                if err := rows.Scan(&amp;medical.FacilityName, &amp;medical.ZipCode, &amp;medical.FacilityAddr, &amp;medical.FacilityTel, &amp;medical.SubmitDate, &amp;medical.FacilityType, &amp;medical.CityName); err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">resultMedical = append(resultMedical, medical)</span>
+        }
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, resultMedical)</span>
+}
+
+func FifthSecond(c *gin.Context) <span class="cov0" title="0">{
+        db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        date, err := time.Parse("2006-01-02", c.Param("date"))
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+                return
+        }</span>
+
+        <span class="cov0" title="0">prefNames := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
+        resultChan := make(chan Medical_count, len(prefNames))
+
+        for _, prefName := range prefNames </span><span class="cov0" title="0">{
+                go func(prefName string) </span><span class="cov0" title="0">{
+                        var count, npatients int
+                        err = db.QueryRow("select count(*) from medical where pref_name = ?", prefName).Scan(&amp;count)
+                        if err != nil </span><span class="cov0" title="0">{
+                                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                                return
+                        }</span>
+                        <span class="cov0" title="0">err = db.QueryRow("select npatients from infection where name_jp = ? and date = ?", prefName, date).Scan(&amp;npatients)
+                        if err != nil </span><span class="cov0" title="0">{
+                                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                                return
+                        }</span>
+                        // 病床使用率を57%として計算 https://stopcovid19.metro.tokyo.lg.jp/
+                        <span class="cov0" title="0">per := npatients / count * 57 / 100
+                        p := strconv.Itoa(int(per))
+                        var message string
+                        if per &gt; 1000 </span><span class="cov0" title="0">{
+                                message = "Too Danger Area"
+                        }</span> else<span class="cov0" title="0"> if per &gt; 700 </span><span class="cov0" title="0">{
+                                message = "Danger Area"
+                        }</span> else<span class="cov0" title="0"> if per &gt; 400 </span><span class="cov0" title="0">{
+                                message = "Warning Area"
+                        }</span> else<span class="cov0" title="0"> if per &gt; 100 </span><span class="cov0" title="0">{
+                                message = "Caution Area"
+                        }</span> else<span class="cov0" title="0"> {
+                                message = "attention Area"
+                        }</span>
+                        <span class="cov0" title="0">resultChan &lt;- Medical_count{Place: prefName, HospitalCount: count, Npatients: npatients, Per: p, Message: message}</span>
+
+                        // }
+                }(prefName)
+        }
+
+        <span class="cov0" title="0">result := make([]Medical_count, 0)
+        for i := 0; i &lt; len(prefNames); i++ </span><span class="cov0" title="0">{
+                result = append(result, &lt;-resultChan)
+        }</span>
+
+        <span class="cov0" title="0">c.JSON(http.StatusOK, result)</span>
+}
+
+func Validate() *validator.Validate <span class="cov8" title="1">{
+        validate := validator.New()
+        return validate
+}</span>
+
+func Import(c *gin.Context) <span class="cov0" title="0">{
+        log.Print("データ取り込み中")
+        url := "https://opendata.corona.go.jp/api/Covid19JapanAll"
+        resp, _ := http.Get(url)
+        if resp != nil </span><span class="cov0" title="0">{
+                defer resp.Body.Close()
+        }</span>
+        <span class="cov0" title="0">byteArray, _ := ioutil.ReadAll(resp.Body)
+
+        jsonBytes := ([]byte)(byteArray)
+        data := new(Npatients)
+
+        if err := json.Unmarshal(jsonBytes, data); err != nil </span><span class="cov0" title="0">{
+                fmt.Println("JSON Unmarshal error:", err)
+                return
+        }</span>
+
+        <span class="cov0" title="0">db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        delete, err := db.Prepare("DELETE FROM infection")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">delete.Exec()
+
+        for _, v := range data.ItemList </span><span class="cov0" title="0">{
+                insert, err := db.Prepare("INSERT INTO infection(date, name_jp, npatients) values (?,?,?)")
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">insert.Exec(v.Date, v.NameJp, v.Npatients)</span>
+        }
+
+        <span class="cov0" title="0">log.Print("データ取り込み完了")</span>
+}
+
+func ImportMedical(c *gin.Context) <span class="cov0" title="0">{
+        log.Print("データ取り込み中")
+        // JSONデータを取得する
+        resp, err := http.Get("https://opendata.corona.go.jp/api/covid19DailySurvey")
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">defer resp.Body.Close()
+
+        byteArray, err := ioutil.ReadAll(resp.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+
+        <span class="cov0" title="0">var records []Medical
+        if err := json.Unmarshal(byteArray, &amp;records); err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+
+        <span class="cov0" title="0">db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">defer db.Close()
+
+        delete, err := db.Prepare("DELETE FROM medical")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">delete.Exec()
+
+        insert, err := db.Prepare("INSERT INTO medical (facility_id, facility_name, zip_code, pref_name, facility_addr, facility_tel, latitude, longitude, submit_date, facility_type, ans_type, local_gov_code, city_name, facility_code) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov0" title="0">defer insert.Close()
+
+        for _, f := range records </span><span class="cov0" title="0">{
+                _, err = insert.Exec(f.FacilityId, f.FacilityName, f.ZipCode, f.PrefName, f.FacilityAddr, f.FacilityTel, f.Latitude, f.Longitude, f.SubmitDate, f.FacilityType, f.AnsType, f.LocalGovCode, f.CityName, f.FacilityCode)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                        return
+                }</span>
+        }
+
+        <span class="cov0" title="0">c.Status(http.StatusOK)
+
+        log.Print("データ取り込み完了")</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

@@ -155,13 +155,8 @@ func main() {
 
 func loggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// ミドルウェアの前処理
 		startTime := time.Now()
-
-		// ミドルウェア内でリクエストの処理を実行
 		c.Next()
-
-		// ミドルウェアの後処理
 		latency := time.Since(startTime)
 		fmt.Println(c.Request.Method, c.Request.URL.Path, c.Writer.Status())
 		time := fmt.Sprintf("%dms", latency/time.Millisecond)
@@ -172,12 +167,16 @@ func loggingMiddleware() gin.HandlerFunc {
 func CountOfPatients(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	defer db.Close()
 
-	date := c.Param("date")
+	date, err := time.Parse("2006-01-02", c.Param("date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
+		return
+	}
 
 	var sum int
 	err = db.QueryRow("select sum(npatients) from infection where date = ?", date).Scan(&sum)
