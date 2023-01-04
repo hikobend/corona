@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -79,5 +80,30 @@ func TestValidate(t *testing.T) {
 	}
 	if _, ok := interface{}(validate).(*validator.Validate); !ok {
 		t.Errorf("Expected Validate to return a *validator.Validate, got %T", validate)
+	}
+}
+
+func TestCreate(t *testing.T) {
+	// Set up a mock HTTP request
+	jsonStr := `{"title": "Test Event", "description": "This is a test event", "begin": "20221231", "end": "20230101"}`
+	req, err := http.NewRequest("POST", "/create", bytes.NewBuffer([]byte(jsonStr)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Set up a mock HTTP response recorder
+	rr := httptest.NewRecorder()
+
+	// Create a new gin.Engine for the test
+	r := gin.Default()
+	r.POST("/create", Create)
+
+	// Call the handler function and pass in the mock request and response
+	r.ServeHTTP(rr, req)
+
+	// Check the status code of the response
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 }
