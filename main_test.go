@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -105,5 +107,71 @@ func TestCreate(t *testing.T) {
 	// Check the status code of the response
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+}
+
+// TestShowEventOK テスト用のデータを用意する
+
+func TestShow(t *testing.T) {
+	r := gin.Default()
+	r.GET("/show/:id", Show)
+
+	// パラメーターが数値でない場合のテスト
+	req, _ := http.NewRequest("GET", "/show/abc", nil)
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Errorf("invalid idのときStatusBadRequestを返すこと")
+	}
+
+	// 存在しないidを指定した場合のテスト
+	req, _ = http.NewRequest("GET", "/show/999", nil)
+	res = httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+	if res.Code != http.StatusNotFound {
+		t.Errorf("存在しないidのときStatusNotFoundを返すこと")
+	}
+
+}
+
+func TestShowAll(t *testing.T) {
+	// テスト用のDBを用意
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+	if err != nil {
+		t.Fatalf("Error opening database: %v", err)
+	}
+	defer db.Close()
+
+	// テストデータをセット
+	_, err = db.Exec("TRUNCATE TABLE events")
+	if err != nil {
+		t.Fatalf("Error truncating table: %v", err)
+	}
+	_, err = db.Exec("INSERT INTO events (title, description, begin, end) VALUES (?, ?, ?, ?)", "タイトル1", "説明1", "2020-01-01", "2020-01-02")
+	if err != nil {
+		t.Fatalf("Error inserting test data: %v", err)
+	}
+	_, err = db.Exec("INSERT INTO events (title, description, begin, end) VALUES (?, ?, ?, ?)", "タイトル2", "説明2", "2020-01-03", "2020-01-04")
+	if err != nil {
+		t.Fatalf("Error inserting test data: %v", err)
+	}
+
+	r := gin.Default()
+	r.GET("/shows", ShowAll)
+
+	req, _ := http.NewRequest("GET", "/shows", nil)
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Errorf("Expected status code %d, got %d", http.StatusOK, res.Code)
+	}
+
+	// レスポンスが期待通りか確認する
+	var result []Event_JSON
+	if err := json.Unmarshal(res.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("Expected 2 records, got %d", len(result))
 	}
 }
