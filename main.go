@@ -108,9 +108,7 @@ func main() {
 	// ----------------------------------
 	// デフォルトで表示
 	// ----------------------------------
-	r.GET("/count/:date", CountOfPatients)                     // 日の感染者の合計
-	r.GET("/averagenpatients/:date", AverageNpatients)         // 日付を入力して、全国の感染者を上回った都道府県を表示
-	r.GET("/averagenpatientsover/:date", AverageNpatientsOver) // 日付を入力して、全国の感染者を下回った都道府県を表示
+	r.GET("/count/:date", CountOfPatients) // 日の感染者の合計
 	// ----------------------------------
 	// 1
 	// ----------------------------------
@@ -192,64 +190,6 @@ func CountOfPatients(c *gin.Context) {
 	})
 }
 
-func AverageNpatients(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients > (select avg(npatients) from infection)", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
-func AverageNpatientsOver(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	date := c.Param("date")
-
-	rows, err := db.Query("select date, name_jp, npatients from infection where date = ? and npatients < (select avg(npatients) from infection)", date)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	var resultInfection []infection
-
-	for rows.Next() {
-		infection := infection{}
-		if err := rows.Scan(&infection.Date, &infection.NameJp, &infection.Npatients); err != nil {
-			log.Fatal(err)
-		}
-		resultInfection = append(resultInfection, infection)
-	}
-
-	c.JSON(http.StatusOK, resultInfection)
-
-}
-
 // -------------
 // 1 - 1
 // -------------
@@ -294,13 +234,14 @@ func FirstFirst(c *gin.Context) {
 				return
 			}
 
-			if npatients.Npatients/npatients.NpatientsPrev*100 > 140 {
+			culc := npatients.Npatients / npatients.NpatientsPrev * 100
+			if culc > 140 {
 				npatients.Message = "Too Danger"
-			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 120 {
+			} else if culc > 120 {
 				npatients.Message = "Danger"
-			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 100 {
+			} else if culc > 100 {
 				npatients.Message = "Warning"
-			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 80 {
+			} else if culc > 80 {
 				npatients.Message = "Caution"
 			} else {
 				npatients.Message = "attention"
@@ -361,13 +302,14 @@ func FirstSecond(c *gin.Context) {
 			s := strconv.Itoa(int(per))
 			npatients.Per = s + "%"
 
-			if npatients.Npatients/npatients.NpatientsPrev*100 > 140 {
+			culc := npatients.Npatients / npatients.NpatientsPrev * 100
+			if culc > 140 {
 				npatients.Message = "Too Danger"
-			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 120 {
+			} else if culc > 120 {
 				npatients.Message = "Danger"
-			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 100 {
+			} else if culc > 100 {
 				npatients.Message = "Warning"
-			} else if npatients.Npatients/npatients.NpatientsPrev*100 > 80 {
+			} else if culc > 80 {
 				npatients.Message = "Caution"
 			} else {
 				npatients.Message = "attention"

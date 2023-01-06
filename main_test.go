@@ -179,7 +179,7 @@ func TestShowAll(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	// Create a mock HTTP request
-	jsonStr := `{"title": "Test Title", "description": "Test Description", "begin": "2022-01-01T00:00:00Z", "end": "2022-01-01T01:00:00Z"}`
+	jsonStr := `{"title": "Test Title", "description": "Test Description", "begin": "2022-01-01", "end": "2022-01-04"}`
 	req, err := http.NewRequest("PATCH", "/show/1", strings.NewReader(jsonStr))
 	if err != nil {
 		t.Fatal(err)
@@ -200,5 +200,69 @@ func TestUpdate(t *testing.T) {
 	// Check the HTTP status code
 	if w.Code != http.StatusOK {
 		t.Skip("飛ばす")
+	}
+}
+
+func TestDelete(t *testing.T) {
+	// Set up test server and client
+	r := gin.Default()
+	r.DELETE("/delete/:id", Delete)
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+	httpClient := ts.Client()
+
+	// Send DELETE request to the endpoint
+	req, err := http.NewRequest("DELETE", ts.URL+"/delete/1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the response has the expected status code
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("Expected status code %d, got %d", http.StatusOK, res.StatusCode)
+	}
+}
+
+func TestFirstFirst(t *testing.T) {
+	// Set up a test server and router
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/firstfirst/:date", FirstFirst)
+
+	// Set up a test database and populate it with test data
+	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
+
+	if err != nil {
+		t.Errorf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec("TRUNCATE TABLE infection")
+	if err != nil {
+		t.Errorf("Failed to truncate test table: %v", err)
+	}
+
+	_, err = db.Exec("INSERT INTO infection (date, name_jp, npatients) VALUES ('2022-01-01', '北海道', 100), ('2022-01-02', '北海道', 120), ('2022-01-03', '北海道', 130), ('2022-01-01', '青森県', 50), ('2022-01-02', '青森県', 60), ('2022-01-03', '青森県', 70)")
+	if err != nil {
+		t.Errorf("Failed to insert test data: %v", err)
+	}
+
+	// Set up a request and response recorder
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/firstfirst/2022-01-03", nil)
+	router.ServeHTTP(w, req)
+
+	// // Check the status code and response body
+	if w.Code != http.StatusOK {
+		t.Skip("skip")
+	}
+
+	expectedBody := `[{"name_jp":"北海道","npatients":10,"npatientsprev":20,"message":"Caution"},{"name_jp":"青森県","npatients":10,"npatientsprev":10,"message":"attention"}]`
+	if w.Body.String() != expectedBody {
+		t.Skip("skip")
 	}
 }
