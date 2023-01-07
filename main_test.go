@@ -267,65 +267,117 @@ func TestFirstFirst(t *testing.T) {
 	}
 }
 
-func TestFirstSecond(t *testing.T) {
-	// Set up test server and router
-	r := gin.Default()
-	r.GET("/firstsecond/:date", FirstSecond)
-	ts := httptest.NewServer(r)
-	defer ts.Close()
+func TestSecondSecond(t *testing.T) {
+	// Initialize a new gin router
+	router := gin.New()
+	router.GET("/npatientsinmonth/:place/:date", SecondSecond)
 
-	// Set up test database
-	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
-	if err != nil {
-		t.Errorf("failed to connect to test database: %v", err)
-	}
-	defer db.Close()
+	// Define the place and date for the test case
+	place := "Tokyo"
+	date := "2022-01"
 
-	// Prepare test data
-	date, err := time.Parse("2006-01-02", "2022-06-01")
-	if err != nil {
-		t.Errorf("failed to parse test date: %v", err)
-	}
-	prevDate := date.AddDate(0, 0, -1)
-	prev2Date := date.AddDate(0, 0, -2)
-	places := []string{"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"}
+	// Perform a GET request to the router with the place and date as parameters
+	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/npatientsinmonth/%s/%s", place, date))
 
-	// Insert test data into the test database
-	stmt, err := db.Prepare("INSERT INTO infection (date, name_jp, npatients) VALUES (?, ?, ?)")
-	if err != nil {
-		t.Errorf("failed to prepare test data insert statement: %v", err)
+	// Check that the response status is OK
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", res.Status)
 	}
-	defer stmt.Close()
-	for _, place := range places {
-		_, err = stmt.Exec(date, place, 10)
-		if err != nil {
-			t.Errorf("failed to insert test data: %v", err)
-		}
-		_, err = stmt.Exec(prevDate, place, 5)
-		if err != nil {
-			t.Errorf("failed to insert test data: %v", err)
-		}
-		_, err = stmt.Exec(prev2Date, place, 2)
-		if err != nil {
-			t.Errorf("failed to insert test data: %v", err)
+
+	// Read the response body
+	body, _ := ioutil.ReadAll(res.Body)
+
+	// Unmarshal the response body into a slice of infection structs
+	var infections []infection
+	json.Unmarshal(body, &infections)
+
+	// Check that the name of the place in the infections is correct
+	for _, infection := range infections {
+		if infection.NameJp != place {
+			t.Errorf("Expected place name %s, got %s", place, infection.NameJp)
 		}
 	}
 
-	// Send request and get response
-	res, err := http.Get(fmt.Sprintf("%s/firstsecond/2022-06-01", ts.URL))
-	if err != nil {
-		t.Errorf("failed to send request: %v", err)
+	// Check that the date of the infections is in the correct month
+	for _, infection := range infections {
+		if infection.Date.Format("2006-01") != date {
+			t.Errorf("Expected date in month %s, got %v", date, infection.Date)
+		}
 	}
-	defer res.Body.Close()
+}
 
-	// Read and decode response body
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		t.Skip("skip")
+func TestSecondThird(t *testing.T) {
+	// Initialize a new gin router
+	router := gin.New()
+	router.GET("/npatientsinyear/:place/:date", SecondSecond)
+
+	// Define the place and date for the test case
+	place := "Tokyo"
+	date := "2022"
+
+	// Perform a GET request to the router with the place and date as parameters
+	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/npatientsinyear/%s/%s", place, date))
+
+	// Check that the response status is OK
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", res.Status)
 	}
-	var infections []diff_Npatients_Place_Per
-	err = json.Unmarshal(body, &infections)
-	if err != nil {
-		t.Skip("skip")
+
+	// Read the response body
+	body, _ := ioutil.ReadAll(res.Body)
+
+	// Unmarshal the response body into a slice of infection structs
+	var infections []infection
+	json.Unmarshal(body, &infections)
+
+	// Check that the name of the place in the infections is correct
+	for _, infection := range infections {
+		if infection.NameJp != place {
+			t.Errorf("Expected place name %s, got %s", place, infection.NameJp)
+		}
+	}
+
+	// Check that the date of the infections is in the correct month
+	for _, infection := range infections {
+		if infection.Date.Format("2006") != date {
+			t.Errorf("Expected date in month %s, got %v", date, infection.Date)
+		}
+	}
+}
+
+func TestThirdSecond(t *testing.T) {
+	// Initialize a new gin router
+	router := gin.New()
+	router.GET("/getInfection/:date1/:date2", ThirdSecond)
+
+	// Define the date range for the test case
+	date1 := "2022-01-01"
+	date2 := "2022-01-31"
+
+	// Perform a GET request to the router with the date range as parameters
+	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/getInfection/%s/%s", date1, date2))
+
+	// Check that the response status is OK
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", res.Status)
+	}
+
+	// Read the response body
+	body, _ := ioutil.ReadAll(res.Body)
+
+	// Unmarshal the response body into a slice of infection structs
+	var infections []infection
+	json.Unmarshal(body, &infections)
+
+	// Check that the slice of infections is not empty
+	if len(infections) == 0 {
+		t.Errorf("Expected non-empty slice of infections, got %v", infections)
+	}
+
+	// Check that the date of the infections is within the specified range
+	for _, infection := range infections {
+		if infection.Date.Format("2006-01-02") < date1 || infection.Date.Format("2006-01-02") > date2 {
+			t.Errorf("Expected date between %s and %s, got %v", date1, date2, infection.Date)
+		}
 	}
 }
