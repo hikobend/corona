@@ -18,57 +18,42 @@ import (
 )
 
 func TestLoggingMiddleware(t *testing.T) {
-	// create a mock request and response
 	req, _ := http.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
-	// create a gin context with the mock request and response
 	c, _ := gin.CreateTestContext(w)
 	c.Request = req
 
-	// call the logging middleware
 	loggingMiddleware()(c)
 
-	// assert that the middleware logged the correct information
 	assert.Equal(t, "GET / 200", fmt.Sprintf("%s %s %d", c.Request.Method, c.Request.URL.Path, w.Code))
-	// assert that the middleware logged a latency time in the correct format
-	// create a start time
 	startTime := time.Now()
 
-	// simulate some latency
 	time.Sleep(100 * time.Millisecond)
 
-	// calculate the latency
 	latency := time.Since(startTime)
 
-	// format the latency as a string
 	timeStr := fmt.Sprintf("%dms", latency/time.Millisecond)
 
-	// assert that the formatted latency is correct
 	assert.Equal(t, "101ms", timeStr)
 }
 
 func TestCountOfPatients(t *testing.T) {
-	// Start the server in a goroutine
 	go main()
 
-	// Wait for the server to start
 	time.Sleep(1 * time.Second)
 
-	// Send a GET request to the /count/:date route
 	res, err := http.Get("http://localhost:8080/count/2022-11-1")
 	if err != nil {
 		t.Errorf("Error sending GET request: %s", err)
 	}
 
-	// Read the response body
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		t.Errorf("Error reading response body: %s", err)
 	}
 
-	// Check that the response is what you expect
 	expected := `{"date":"2022-01-01","npatients":100}`
 	if string(body) != expected {
 		t.Skip("スキップ")
@@ -87,7 +72,6 @@ func TestValidate(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	// Set up a mock HTTP request
 	jsonStr := `{"title": "Test Event", "description": "This is a test event", "begin": "20221231", "end": "20230101"}`
 	req, err := http.NewRequest("POST", "/create", bytes.NewBuffer([]byte(jsonStr)))
 	if err != nil {
@@ -95,29 +79,22 @@ func TestCreate(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	// Set up a mock HTTP response recorder
 	rr := httptest.NewRecorder()
 
-	// Create a new gin.Engine for the test
 	r := gin.Default()
 	r.POST("/create", Create)
 
-	// Call the handler function and pass in the mock request and response
 	r.ServeHTTP(rr, req)
 
-	// Check the status code of the response
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 }
 
-// TestShowEventOK テスト用のデータを用意する
-
 func TestShow(t *testing.T) {
 	r := gin.Default()
 	r.GET("/show/:id", Show)
 
-	// パラメーターが数値でない場合のテスト
 	req, _ := http.NewRequest("GET", "/show/abc", nil)
 	res := httptest.NewRecorder()
 	r.ServeHTTP(res, req)
@@ -125,7 +102,6 @@ func TestShow(t *testing.T) {
 		t.Errorf("invalid idのときStatusBadRequestを返すこと")
 	}
 
-	// 存在しないidを指定した場合のテスト
 	req, _ = http.NewRequest("GET", "/show/999", nil)
 	res = httptest.NewRecorder()
 	r.ServeHTTP(res, req)
@@ -136,14 +112,12 @@ func TestShow(t *testing.T) {
 }
 
 func TestShowAll(t *testing.T) {
-	// テスト用のDBを用意
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		t.Fatalf("Error opening database: %v", err)
 	}
 	defer db.Close()
 
-	// テストデータをセット
 	_, err = db.Exec("TRUNCATE TABLE events")
 	if err != nil {
 		t.Fatalf("Error truncating table: %v", err)
@@ -167,7 +141,6 @@ func TestShowAll(t *testing.T) {
 		t.Errorf("Expected status code %d, got %d", http.StatusOK, res.Code)
 	}
 
-	// レスポンスが期待通りか確認する
 	var result []Event_JSON
 	if err := json.Unmarshal(res.Body.Bytes(), &result); err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
@@ -178,40 +151,33 @@ func TestShowAll(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	// Create a mock HTTP request
 	jsonStr := `{"title": "Test Title", "description": "Test Description", "begin": "2022-01-01", "end": "2022-01-04"}`
 	req, err := http.NewRequest("PATCH", "/show/1", strings.NewReader(jsonStr))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a mock gin context
 	w := httptest.NewRecorder()
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(w)
 	c.Request = req
 
-	// Set the mock context param "id" to 1
 	c.Params = append(c.Params, gin.Param{Key: "id", Value: "1"})
 
-	// Call the Update function with the mock context
 	Update(c)
 
-	// Check the HTTP status code
 	if w.Code != http.StatusOK {
 		t.Skip("飛ばす")
 	}
 }
 
 func TestDelete(t *testing.T) {
-	// Set up test server and client
 	r := gin.Default()
 	r.DELETE("/delete/:id", Delete)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 	httpClient := ts.Client()
 
-	// Send DELETE request to the endpoint
 	req, err := http.NewRequest("DELETE", ts.URL+"/delete/1", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -221,19 +187,16 @@ func TestDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check that the response has the expected status code
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("Expected status code %d, got %d", http.StatusOK, res.StatusCode)
 	}
 }
 
 func TestFirstFirst(t *testing.T) {
-	// Set up a test server and router
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/firstfirst/:date", FirstFirst)
 
-	// Set up a test database and populate it with test data
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 
 	if err != nil {
@@ -251,12 +214,10 @@ func TestFirstFirst(t *testing.T) {
 		t.Errorf("Failed to insert test data: %v", err)
 	}
 
-	// Set up a request and response recorder
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/firstfirst/2022-01-03", nil)
 	router.ServeHTTP(w, req)
 
-	// // Check the status code and response body
 	if w.Code != http.StatusOK {
 		t.Skip("skip")
 	}
@@ -268,37 +229,29 @@ func TestFirstFirst(t *testing.T) {
 }
 
 func TestSecondSecond(t *testing.T) {
-	// Initialize a new gin router
 	router := gin.New()
 	router.GET("/npatientsinmonth/:place/:date", SecondSecond)
 
-	// Define the place and date for the test case
 	place := "Tokyo"
 	date := "2022-01"
 
-	// Perform a GET request to the router with the place and date as parameters
 	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/npatientsinmonth/%s/%s", place, date))
 
-	// Check that the response status is OK
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("Expected status OK, got %v", res.Status)
 	}
 
-	// Read the response body
 	body, _ := ioutil.ReadAll(res.Body)
 
-	// Unmarshal the response body into a slice of infection structs
 	var infections []infection
 	json.Unmarshal(body, &infections)
 
-	// Check that the name of the place in the infections is correct
 	for _, infection := range infections {
 		if infection.NameJp != place {
 			t.Errorf("Expected place name %s, got %s", place, infection.NameJp)
 		}
 	}
 
-	// Check that the date of the infections is in the correct month
 	for _, infection := range infections {
 		if infection.Date.Format("2006-01") != date {
 			t.Errorf("Expected date in month %s, got %v", date, infection.Date)
@@ -307,37 +260,29 @@ func TestSecondSecond(t *testing.T) {
 }
 
 func TestSecondThird(t *testing.T) {
-	// Initialize a new gin router
 	router := gin.New()
 	router.GET("/npatientsinyear/:place/:date", SecondSecond)
 
-	// Define the place and date for the test case
 	place := "Tokyo"
 	date := "2022"
 
-	// Perform a GET request to the router with the place and date as parameters
 	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/npatientsinyear/%s/%s", place, date))
 
-	// Check that the response status is OK
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("Expected status OK, got %v", res.Status)
 	}
 
-	// Read the response body
 	body, _ := ioutil.ReadAll(res.Body)
 
-	// Unmarshal the response body into a slice of infection structs
 	var infections []infection
 	json.Unmarshal(body, &infections)
 
-	// Check that the name of the place in the infections is correct
 	for _, infection := range infections {
 		if infection.NameJp != place {
 			t.Errorf("Expected place name %s, got %s", place, infection.NameJp)
 		}
 	}
 
-	// Check that the date of the infections is in the correct month
 	for _, infection := range infections {
 		if infection.Date.Format("2006") != date {
 			t.Errorf("Expected date in month %s, got %v", date, infection.Date)
@@ -346,35 +291,27 @@ func TestSecondThird(t *testing.T) {
 }
 
 func TestThirdSecond(t *testing.T) {
-	// Initialize a new gin router
 	router := gin.New()
 	router.GET("/getInfection/:date1/:date2", ThirdSecond)
 
-	// Define the date range for the test case
 	date1 := "2022-01-01"
 	date2 := "2022-01-31"
 
-	// Perform a GET request to the router with the date range as parameters
 	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/getInfection/%s/%s", date1, date2))
 
-	// Check that the response status is OK
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("Expected status OK, got %v", res.Status)
 	}
 
-	// Read the response body
 	body, _ := ioutil.ReadAll(res.Body)
 
-	// Unmarshal the response body into a slice of infection structs
 	var infections []infection
 	json.Unmarshal(body, &infections)
 
-	// Check that the slice of infections is not empty
 	if len(infections) == 0 {
 		t.Errorf("Expected non-empty slice of infections, got %v", infections)
 	}
 
-	// Check that the date of the infections is within the specified range
 	for _, infection := range infections {
 		if infection.Date.Format("2006-01-02") < date1 || infection.Date.Format("2006-01-02") > date2 {
 			t.Errorf("Expected date between %s and %s, got %v", date1, date2, infection.Date)
@@ -383,43 +320,34 @@ func TestThirdSecond(t *testing.T) {
 }
 
 func TestThirdThird(t *testing.T) {
-	// Initialize a new gin router
 	router := gin.New()
 	router.GET("/getnpatients/:place/:date1/:date2", ThirdThird)
 
-	// Define the place, date1, and date2 for the test case
 	place := "北海道"
 	date1 := "2022-01-01"
 	date2 := "2022-01-31"
 
-	// Perform a GET request to the router with the place, date1, and date2 as parameters
 	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/getnpatients/%s/%s/%s", place, date1, date2))
 
-	// Check that the response status is OK
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("Expected status OK, got %v", res.Status)
 	}
 
-	// Read the response body
 	body, _ := ioutil.ReadAll(res.Body)
 
-	// Unmarshal the response body into a slice of infection structs
 	var infections []infection
 	json.Unmarshal(body, &infections)
 
-	// Check that the slice of infections is not empty
 	if len(infections) == 0 {
 		t.Skip("skip")
 	}
 
-	// Check that the name of the place in the infections is correct
 	for _, infection := range infections {
 		if infection.NameJp != place {
 			t.Errorf("Expected place name %s, got %s", place, infection.NameJp)
 		}
 	}
 
-	// Check that the date of the infections is within the specified range
 	for _, infection := range infections {
 		if infection.Date.Format("2006-01-02") < date1 || infection.Date.Format("2006-01-02") > date2 {
 			t.Errorf("Expected date between %s and %s, got %v", date1, date2, infection.Date)
@@ -428,40 +356,31 @@ func TestThirdThird(t *testing.T) {
 }
 
 func TestForthFirst(t *testing.T) {
-	// Create a mock HTTP request
 	req, err := http.NewRequest(http.MethodGet, "/medicals/tokyo", nil)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
 
-	// Create a response recorder to record the response
 	recorder := httptest.NewRecorder()
 
-	// Create a Gin context with the request and response recorder
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = req
 
-	// Call the ForthFirst function with the Gin context
 	ForthFirst(ctx)
 
-	// Check the status code of the response
 	if recorder.Code != http.StatusOK {
 		t.Errorf("Expected status OK but got %v", recorder.Code)
 	}
 
-	// Unmarshal the response body into a slice of Medicals
 	var medicals []Medicals
 	if err := json.Unmarshal(recorder.Body.Bytes(), &medicals); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
-	// Check that the slice of Medicals is not empty
 	if len(medicals) == 0 {
 		t.Skip("Skip")
 	}
 }
-
-// 医療法人永仁会永仁会病院
 
 func TestForthSecond(t *testing.T) {
 	r := gin.Default()
