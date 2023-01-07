@@ -419,3 +419,5 @@ func TestFifthFirst(t *testing.T) {
 		t.Errorf("Error unmarshalling JSON response: %v", err)
 	}
 }
+
+// goroutineのtestは一旦後回し
