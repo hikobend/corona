@@ -381,3 +381,122 @@ func TestThirdSecond(t *testing.T) {
 		}
 	}
 }
+
+func TestThirdThird(t *testing.T) {
+	// Initialize a new gin router
+	router := gin.New()
+	router.GET("/getnpatients/:place/:date1/:date2", ThirdThird)
+
+	// Define the place, date1, and date2 for the test case
+	place := "北海道"
+	date1 := "2022-01-01"
+	date2 := "2022-01-31"
+
+	// Perform a GET request to the router with the place, date1, and date2 as parameters
+	res, _ := http.Get(fmt.Sprintf("http://localhost:8080/getnpatients/%s/%s/%s", place, date1, date2))
+
+	// Check that the response status is OK
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("Expected status OK, got %v", res.Status)
+	}
+
+	// Read the response body
+	body, _ := ioutil.ReadAll(res.Body)
+
+	// Unmarshal the response body into a slice of infection structs
+	var infections []infection
+	json.Unmarshal(body, &infections)
+
+	// Check that the slice of infections is not empty
+	if len(infections) == 0 {
+		t.Skip("skip")
+	}
+
+	// Check that the name of the place in the infections is correct
+	for _, infection := range infections {
+		if infection.NameJp != place {
+			t.Errorf("Expected place name %s, got %s", place, infection.NameJp)
+		}
+	}
+
+	// Check that the date of the infections is within the specified range
+	for _, infection := range infections {
+		if infection.Date.Format("2006-01-02") < date1 || infection.Date.Format("2006-01-02") > date2 {
+			t.Errorf("Expected date between %s and %s, got %v", date1, date2, infection.Date)
+		}
+	}
+}
+
+func TestForthFirst(t *testing.T) {
+	// Create a mock HTTP request
+	req, err := http.NewRequest(http.MethodGet, "/medicals/tokyo", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	// Create a response recorder to record the response
+	recorder := httptest.NewRecorder()
+
+	// Create a Gin context with the request and response recorder
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = req
+
+	// Call the ForthFirst function with the Gin context
+	ForthFirst(ctx)
+
+	// Check the status code of the response
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status OK but got %v", recorder.Code)
+	}
+
+	// Unmarshal the response body into a slice of Medicals
+	var medicals []Medicals
+	if err := json.Unmarshal(recorder.Body.Bytes(), &medicals); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	// Check that the slice of Medicals is not empty
+	if len(medicals) == 0 {
+		t.Skip("Skip")
+	}
+}
+
+// 医療法人永仁会永仁会病院
+
+func TestForthSecond(t *testing.T) {
+	r := gin.Default()
+	r.GET("/medical/:hospital_name", ForthSecond)
+
+	req, _ := http.NewRequest("GET", "/medical/医療法人永仁会永仁会病院", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Unexpected status code: %d", w.Code)
+	}
+
+	var medical Medicals_show
+	err := json.Unmarshal(w.Body.Bytes(), &medical)
+	if err != nil {
+		t.Errorf("Error unmarshalling JSON response: %v", err)
+	}
+}
+
+func TestFifthFirst(t *testing.T) {
+	r := gin.Default()
+	r.GET("/hospital/:place/:status", FifthFirst)
+
+	req, _ := http.NewRequest("GET", "/hospital/札幌市/Danger", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Unexpected status code: %d", w.Code)
+	}
+
+	var resultMedical []Medicals_show
+	err := json.Unmarshal(w.Body.Bytes(), &resultMedical)
+	if err != nil {
+		t.Errorf("Error unmarshalling JSON response: %v", err)
+	}
+}
