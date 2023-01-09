@@ -38,27 +38,42 @@ func TestLoggingMiddleware(t *testing.T) {
 	assert.Equal(t, "101ms", timeStr)
 }
 
-func TestCountOfPatients(t *testing.T) {
+func TestCountOfPatient(t *testing.T) {
+	// Start the server in a goroutine
 	go main()
 
+	// Wait for the server to start
 	time.Sleep(1 * time.Second)
 
-	res, err := http.Get("http://localhost:8080/count/2022-11-1")
+	// Send a fake HTTP request
+	res, err := http.Get("http://localhost:8080/count/2022-01-01")
 	if err != nil {
-		t.Errorf("Error sending GET request: %s", err)
+		t.Error(err)
+		return
 	}
-
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+
+	// Check the HTTP status code
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected HTTP status code: %d", res.StatusCode)
+	}
+
+	// Check the response body
+	var response struct {
+		Date      string `json:"date"`
+		Npatients int    `json:"npatients"`
+	}
+	err = json.NewDecoder(res.Body).Decode(&response)
 	if err != nil {
-		t.Errorf("Error reading response body: %s", err)
+		t.Error(err)
+		return
 	}
-
-	expected := `{"date":"2022-01-01","npatients":100}`
-	if string(body) != expected {
-		t.Skip("スキップ")
+	if response.Date != "2022-01-01T00:00:00Z" {
+		t.Errorf("unexpected date: %s", response.Date)
 	}
-
+	if response.Npatients != 150 {
+		t.Errorf("unexpected npatients: %d", response.Npatients)
+	}
 }
 
 func TestValidate(t *testing.T) {
@@ -72,7 +87,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	jsonStr := `{"title": "Test Event", "description": "This is a test event", "begin": "20221231", "end": "20230101"}`
+	jsonStr := `{"title": "Test Event", "description": "This is a test event", "begin": "2022-12-31", "end": "2023-01-01"}`
 	req, err := http.NewRequest("POST", "/create", bytes.NewBuffer([]byte(jsonStr)))
 	if err != nil {
 		t.Fatal(err)

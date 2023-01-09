@@ -340,78 +340,35 @@ func SecondFirst(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}) // 400
 		return
 	}
-	prevDate := date.AddDate(0, 0, -1)
-	prev2Date := date.AddDate(0, 0, -2)
-	prev3Date := date.AddDate(0, 0, -3)
-	prev4Date := date.AddDate(0, 0, -4)
-	prev5Date := date.AddDate(0, 0, -5)
-	prev6Date := date.AddDate(0, 0, -6)
+	prevDates := []time.Time{
+		date.AddDate(0, 0, -1),
+		date.AddDate(0, 0, -2),
+		date.AddDate(0, 0, -3),
+		date.AddDate(0, 0, -4),
+		date.AddDate(0, 0, -5),
+		date.AddDate(0, 0, -6),
+		date.AddDate(0, 0, -7),
+	}
 
 	place := c.Param("place")
-
-	var infection1, infection2, infection3, infection4, infection5, infection6, infection7 infection
+	var infections []infection
 	var wg sync.WaitGroup
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, date).Scan(&infection1.Date, &infection1.NameJp, &infection1.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prevDate).Scan(&infection2.Date, &infection2.NameJp, &infection2.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev2Date).Scan(&infection3.Date, &infection3.NameJp, &infection3.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev3Date).Scan(&infection4.Date, &infection4.NameJp, &infection4.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev4Date).Scan(&infection5.Date, &infection5.NameJp, &infection5.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev5Date).Scan(&infection6.Date, &infection6.NameJp, &infection6.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prev6Date).Scan(&infection7.Date, &infection7.NameJp, &infection7.Npatients)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
-			return
-		}
-	}()
-	wg.Add(7)
+
+	for _, prevDate := range prevDates {
+		wg.Add(1)
+		go func(prevDate time.Time) {
+			defer wg.Done()
+			var infection infection
+			err = db.QueryRow("SELECT date, name_jp, npatients FROM infection WHERE name_jp = ? and date = ?", place, prevDate).Scan(&infection.Date, &infection.NameJp, &infection.Npatients)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // 500
+				return
+			}
+			infections = append(infections, infection)
+		}(prevDate)
+	}
+
 	wg.Wait()
-
-	infections := []infection{infection1, infection2, infection3, infection4, infection5, infection6, infection7}
-
 	c.JSON(http.StatusOK, infections)
 }
 
@@ -575,7 +532,7 @@ func Create(c *gin.Context) {
 	}
 
 	// yyyymmdd形式の文字列をtime.Time型に変換
-	layout := "20060102"
+	layout := "2006-01-02"
 	t, err := time.Parse(layout, json.Begin)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -940,6 +897,7 @@ func Import(c *gin.Context) {
 		return
 	}
 
+	// db, err := sql.Open("mysql", "root:password@(db:3306)/training?parseTime=true")
 	db, err := sql.Open("mysql", "root:password@(localhost:3306)/local?parseTime=true")
 	if err != nil {
 		log.Fatal(err)
