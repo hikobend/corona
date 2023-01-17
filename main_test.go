@@ -435,4 +435,37 @@ func TestFifthFirst(t *testing.T) {
 	}
 }
 
-// goroutineのtestは一旦後回し
+func TestSecondFirst(t *testing.T) {
+	// Start the server
+	go main()
+	time.Sleep(1 * time.Second) // Wait for the server to start
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("GET", "http://localhost:8080/secondfirst/北海道/2022-01-01", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a new HTTP client and execute the request
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// // Check the status code
+	// if res.StatusCode != http.StatusOK {
+	// 	t.Errorf("unexpected status code: %d", res.StatusCode)
+	// }
+
+	// Decode the response body
+	var infections []infection
+	if err := json.NewDecoder(res.Body).Decode(&infections); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the number of infections
+	if len(infections) != 7 {
+		t.Errorf("unexpected number of infections: %d", len(infections))
+	}
+}
